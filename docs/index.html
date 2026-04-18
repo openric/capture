@@ -989,6 +989,25 @@
       document.getElementById('config-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
       serverInput.focus();
     });
+
+    // --- Deep-link support ----------------------------------------
+    // Browse demo and external tools can deep-link into the edit flow via
+    // ?type=place&id=912402 — we auto-fill the edit bar and trigger load.
+    // New-entity link: ?type=place  (no id) opens the create form for that type.
+    (function handleUrlParams() {
+      const params = new URLSearchParams(window.location.search);
+      const type = (params.get('type') || '').toLowerCase();
+      const id   = params.get('id');
+      if (!type || !FORMS[type]) return;
+      if (id) {
+        editType.value = type;
+        editIdEl.value = id;
+        // Defer until the page settles so config-status has rendered.
+        setTimeout(() => editLoad.click(), 50);
+      } else {
+        setTimeout(() => openForm(type), 50);
+      }
+    })();
   </script>
 </body>
 </html>
