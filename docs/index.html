@@ -1,0 +1,482 @@
+<!--
+  Copyright (C) 2026 Johan Pieterse / Plain Sailing Information Systems
+  Email: johan@plainsailingisystems.co.za
+  SPDX-License-Identifier: AGPL-3.0-or-later
+
+  OpenRiC Capture — a pure-browser data-entry tool for any server
+  that implements the OpenRiC Viewing API (/api/ric/v1/*). The user
+  supplies a server URL and an API key with the "write" scope; every
+  captured entity is POSTed straight to that server. No build step;
+  no backend; no Heratio assumptions. Symmetrical to @openric/viewer.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OpenRiC Capture</title>
+  <meta name="description" content="Pure-browser data-entry tool for any OpenRiC-conformant server." />
+  <link rel="canonical" href="https://capture.openric.org/" />
+  <style>
+    :root {
+      --fg: #e5e7eb; --muted: #9ca3af; --bg: #111827; --panel: #1f2937;
+      --panel-alt: #0f172a; --border: #334155; --accent: #3b82f6; --accent-hover: #2563eb;
+      --ok: #10b981; --err: #ef4444;
+    }
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 0; background: var(--bg); color: var(--fg); line-height: 1.5; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    header { background: var(--panel-alt); border-bottom: 1px solid var(--border); padding: 0.6rem 1.2rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+    header h1 { margin: 0; font-size: 1rem; font-weight: 600; }
+    header h1 small { color: var(--muted); font-weight: 400; margin-left: 0.4rem; font-size: 0.8rem; }
+    header .nav-right { margin-left: auto; display: flex; gap: 0.5rem; align-items: center; }
+    header button { background: var(--panel); color: var(--fg); border: 1px solid var(--border); padding: 0.35rem 0.7rem; border-radius: 4px; font-size: 0.85rem; cursor: pointer; }
+    header button:hover { background: var(--border); }
+
+    main { max-width: 1100px; margin: 0 auto; padding: 1.5rem 1.2rem 3rem; }
+
+    .config-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.2rem; margin-bottom: 1.5rem; }
+    .config-panel h2 { margin: 0 0 0.6rem; font-size: 0.95rem; }
+    .config-panel .row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 0.6rem; align-items: end; }
+    .config-panel label { font-size: 0.78rem; color: var(--muted); display: block; }
+    .config-panel input { width: 100%; background: var(--bg); color: var(--fg); border: 1px solid var(--border); padding: 0.4rem 0.55rem; border-radius: 4px; font-size: 0.88rem; font-family: monospace; }
+    .config-panel button { background: var(--accent); color: #fff; border: 1px solid var(--accent); padding: 0.42rem 0.9rem; border-radius: 4px; font-weight: 600; cursor: pointer; }
+    .config-panel button:hover { background: var(--accent-hover); }
+    .config-panel .status { margin-top: 0.6rem; font-size: 0.82rem; color: var(--muted); }
+    .config-panel .status.ok { color: var(--ok); }
+    .config-panel .status.err { color: var(--err); }
+
+    .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.9rem; margin-bottom: 2rem; }
+    .tile { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 1.1rem; cursor: pointer; transition: border-color 0.15s, transform 0.15s; }
+    .tile:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .tile .icon { font-size: 1.5rem; display: block; margin-bottom: 0.5rem; }
+    .tile h3 { margin: 0 0 0.3rem; font-size: 1rem; }
+    .tile p { margin: 0; color: var(--muted); font-size: 0.82rem; }
+
+    .form-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 1.3rem 1.5rem; margin-bottom: 2rem; display: none; }
+    .form-panel.active { display: block; }
+    .form-panel h2 { margin: 0 0 1rem; font-size: 1.1rem; }
+    .form-panel .field { margin-bottom: 0.85rem; }
+    .form-panel .field.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+    .form-panel .field.three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.8rem; }
+    .form-panel label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.25rem; }
+    .form-panel label .req { color: var(--err); }
+    .form-panel input, .form-panel select, .form-panel textarea { width: 100%; background: var(--bg); color: var(--fg); border: 1px solid var(--border); padding: 0.45rem 0.6rem; border-radius: 4px; font-size: 0.88rem; font-family: inherit; }
+    .form-panel textarea { min-height: 70px; resize: vertical; }
+    .form-panel .actions { display: flex; gap: 0.6rem; margin-top: 1rem; }
+    .form-panel .submit { background: var(--accent); color: #fff; border: 1px solid var(--accent); padding: 0.5rem 1rem; border-radius: 4px; font-weight: 600; cursor: pointer; }
+    .form-panel .submit:hover { background: var(--accent-hover); }
+    .form-panel .cancel { background: transparent; color: var(--muted); border: 1px solid var(--border); padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; }
+    .form-panel .hint { font-size: 0.76rem; color: var(--muted); margin-top: 0.25rem; }
+    .form-panel .result { margin-top: 1rem; padding: 0.6rem 0.85rem; border-radius: 4px; font-size: 0.85rem; display: none; }
+    .form-panel .result.ok { background: rgba(16,185,129,0.15); color: var(--ok); border: 1px solid rgba(16,185,129,0.4); display: block; }
+    .form-panel .result.err { background: rgba(239,68,68,0.12); color: var(--err); border: 1px solid rgba(239,68,68,0.4); display: block; }
+
+    .recent { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.3rem; }
+    .recent h2 { margin: 0 0 0.7rem; font-size: 1rem; }
+    .recent .empty { color: var(--muted); font-size: 0.85rem; }
+    .recent ul { list-style: none; padding: 0; margin: 0; }
+    .recent li { display: flex; gap: 0.6rem; align-items: center; padding: 0.35rem 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
+    .recent li:last-child { border-bottom: none; }
+    .recent .type-badge { font-size: 0.7rem; background: var(--border); color: var(--fg); padding: 0.08rem 0.45rem; border-radius: 3px; text-transform: lowercase; }
+    .recent time { color: var(--muted); font-size: 0.76rem; margin-left: auto; white-space: nowrap; }
+    .recent a { color: var(--fg); }
+
+    .disclaimer { color: var(--muted); font-size: 0.78rem; text-align: center; margin-top: 2rem; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1><a href="https://openric.org">OpenRiC</a> Capture <small>v0.1.0 · implementation-neutral</small></h1>
+    <div class="nav-right">
+      <button id="btn-settings" type="button">Settings</button>
+      <a href="https://viewer.openric.org" target="_blank" rel="noopener" style="font-size:0.85rem;">Viewer ↗</a>
+      <a href="https://github.com/openric/capture" target="_blank" rel="noopener" style="font-size:0.85rem;">Source ↗</a>
+    </div>
+  </header>
+
+  <main>
+    <div class="config-panel" id="config-panel">
+      <h2>Connection</h2>
+      <div class="row">
+        <div>
+          <label for="server-url">Server base URL</label>
+          <input id="server-url" placeholder="https://heratio.theahg.co.za/api/ric/v1" />
+        </div>
+        <div>
+          <label for="api-key">API key (<code>write</code> scope)</label>
+          <input id="api-key" type="password" placeholder="paste a key with write scope" />
+        </div>
+        <div>
+          <button id="btn-save-config" type="button">Save</button>
+        </div>
+      </div>
+      <div class="status" id="config-status">
+        No server configured yet. Enter a URL + API key and click Save. The key is stored in your browser's <code>localStorage</code>, never sent anywhere except the server above.
+      </div>
+    </div>
+
+    <section>
+      <h2 style="margin: 0 0 0.9rem; font-size: 1.05rem;">Capture</h2>
+      <div class="tiles" id="tiles">
+        <div class="tile" data-type="place">
+          <span class="icon">📍</span>
+          <h3>Place</h3>
+          <p>Geographic or topographical entity.</p>
+        </div>
+        <div class="tile" data-type="rule">
+          <span class="icon">⚖️</span>
+          <h3>Rule / Mandate</h3>
+          <p>Legislation, retention schedule, policy.</p>
+        </div>
+        <div class="tile" data-type="activity">
+          <span class="icon">🏃</span>
+          <h3>Activity</h3>
+          <p>Production, accumulation, custody event.</p>
+        </div>
+        <div class="tile" data-type="instantiation">
+          <span class="icon">📄</span>
+          <h3>Instantiation</h3>
+          <p>Physical / digital manifestation of a record.</p>
+        </div>
+        <div class="tile" data-type="relation">
+          <span class="icon">🔗</span>
+          <h3>Relation</h3>
+          <p>Link two existing entities with a <code>rico:*</code> predicate.</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="form-panel" id="form-panel"></div>
+
+    <section class="recent">
+      <h2>Recent captures <small style="color:var(--muted); font-weight:400; font-size:0.78rem; margin-left:0.5rem;">(this browser, last 20)</small></h2>
+      <div id="recent-content"><p class="empty">Nothing captured yet.</p></div>
+    </section>
+
+    <p class="disclaimer">
+      OpenRiC Capture is licensed <a href="https://www.gnu.org/licenses/agpl-3.0.html">AGPL&nbsp;3.0</a>.
+      It does not include or require Heratio — any OpenRiC-conformant server
+      is a valid backend.
+      Spec: <a href="https://openric.org">openric.org</a>.
+    </p>
+  </main>
+
+  <script>
+    const STORAGE_KEY = 'openric-capture:config';
+    const RECENT_KEY = 'openric-capture:recent';
+
+    function loadConfig() {
+      try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch { return {}; }
+    }
+    function saveConfig(cfg) { localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg)); }
+    function loadRecent() {
+      try { return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]'); } catch { return []; }
+    }
+    function pushRecent(entry) {
+      const list = loadRecent();
+      list.unshift(entry);
+      localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, 20)));
+      renderRecent();
+    }
+
+    function escapeHtml(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    const serverInput = document.getElementById('server-url');
+    const keyInput = document.getElementById('api-key');
+    const saveBtn = document.getElementById('btn-save-config');
+    const statusEl = document.getElementById('config-status');
+
+    // Seed the server field with the Heratio reference implementation
+    // — a sensible default that works out of the box.
+    const initialCfg = loadConfig();
+    serverInput.value = initialCfg.server || 'https://heratio.theahg.co.za/api/ric/v1';
+    keyInput.value = initialCfg.key || '';
+    renderConfigStatus();
+
+    function renderConfigStatus() {
+      const cfg = loadConfig();
+      if (!cfg.server || !cfg.key) {
+        statusEl.className = 'status';
+        statusEl.innerHTML = 'No server configured yet. Enter a URL + API key and click Save. The key is stored in your browser\'s <code>localStorage</code>, never sent anywhere except the server above.';
+        return;
+      }
+      statusEl.className = 'status ok';
+      statusEl.innerHTML = `Configured for <code>${escapeHtml(cfg.server)}</code> &nbsp;·&nbsp; <a href="#" id="btn-clear-config">Forget key</a>`;
+      const clear = document.getElementById('btn-clear-config');
+      if (clear) clear.addEventListener('click', (e) => {
+        e.preventDefault();
+        saveConfig({ server: cfg.server, key: '' });
+        keyInput.value = '';
+        renderConfigStatus();
+      });
+    }
+
+    saveBtn.addEventListener('click', async () => {
+      const server = serverInput.value.trim().replace(/\/$/, '');
+      const key = keyInput.value.trim();
+      if (!server) { statusEl.className = 'status err'; statusEl.textContent = 'Server URL is required.'; return; }
+      saveConfig({ server, key });
+      statusEl.className = 'status';
+      statusEl.textContent = 'Saved. Probing /health…';
+      try {
+        const resp = await fetch(server + '/health');
+        if (resp.ok) {
+          statusEl.className = 'status ok';
+          statusEl.innerHTML = `Server reachable. ${key ? 'Key saved in <code>localStorage</code>.' : '<em>No key entered — reads will work, writes will fail.</em>'}`;
+        } else {
+          statusEl.className = 'status err';
+          statusEl.textContent = `Server returned ${resp.status} on /health. Check the URL.`;
+        }
+      } catch (e) {
+        statusEl.className = 'status err';
+        statusEl.textContent = `Could not reach server: ${e.message}. Check the URL + CORS.`;
+      }
+    });
+
+    // --- API client ------------------------------------------------
+    async function apiPost(path, body) {
+      const cfg = loadConfig();
+      if (!cfg.server) throw new Error('Server not configured — click Settings.');
+      const resp = await fetch(cfg.server + path, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          ...(cfg.key ? { 'X-API-Key': cfg.key } : {}),
+        },
+        body: JSON.stringify(body),
+      });
+      const text = await resp.text();
+      let parsed = null;
+      try { parsed = JSON.parse(text); } catch {}
+      if (!resp.ok) {
+        const msg = parsed?.error || parsed?.message || text || `HTTP ${resp.status}`;
+        throw new Error(msg);
+      }
+      return parsed ?? {};
+    }
+
+    async function apiGet(path) {
+      const cfg = loadConfig();
+      if (!cfg.server) throw new Error('Server not configured.');
+      const resp = await fetch(cfg.server + path, {
+        headers: { 'Accept': 'application/json', ...(cfg.key ? { 'X-API-Key': cfg.key } : {}) },
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      return resp.json();
+    }
+
+    // --- Forms -----------------------------------------------------
+    const FORMS = {
+      place: {
+        title: 'Create a Place',
+        endpoint: '/places',
+        taxonomy: 'ric_place_type',
+        fields: (opts) => `
+          <div class="field"><label>Name <span class="req">*</span></label><input name="name" required /></div>
+          <div class="field two-col">
+            <div><label>Type</label>${opts.typeSelect}</div>
+            <div><label>Authority URI</label><input name="authority_uri" type="url" placeholder="https://www.geonames.org/..." /></div>
+          </div>
+          <div class="field two-col">
+            <div><label>Latitude</label><input name="latitude" type="number" step="any" /></div>
+            <div><label>Longitude</label><input name="longitude" type="number" step="any" /></div>
+          </div>
+          <div class="field"><label>Address</label><textarea name="address" rows="2"></textarea></div>
+          <div class="field"><label>Description</label><textarea name="description" rows="3"></textarea></div>
+        `,
+      },
+      rule: {
+        title: 'Create a Rule / Mandate',
+        endpoint: '/rules',
+        taxonomy: 'ric_rule_type',
+        fields: (opts) => `
+          <div class="field"><label>Title <span class="req">*</span></label><input name="title" required /></div>
+          <div class="field two-col">
+            <div><label>Type</label>${opts.typeSelect}</div>
+            <div><label>Jurisdiction</label><input name="jurisdiction" /></div>
+          </div>
+          <div class="field two-col">
+            <div><label>Start date</label><input name="start_date" type="date" /></div>
+            <div><label>End date</label><input name="end_date" type="date" /></div>
+          </div>
+          <div class="field"><label>Authority URI</label><input name="authority_uri" type="url" /></div>
+          <div class="field"><label>Description</label><textarea name="description" rows="3"></textarea></div>
+          <div class="field"><label>Legislation</label><textarea name="legislation" rows="2"></textarea></div>
+          <div class="field"><label>Sources</label><textarea name="sources" rows="2"></textarea></div>
+        `,
+      },
+      activity: {
+        title: 'Create an Activity',
+        endpoint: '/activities',
+        taxonomy: 'ric_activity_type',
+        fields: (opts) => `
+          <div class="field"><label>Name <span class="req">*</span></label><input name="name" required /></div>
+          <div class="field two-col">
+            <div><label>Type</label>${opts.typeSelect}</div>
+            <div><label>Date display</label><input name="date_display" placeholder="c. 2400 BC" /></div>
+          </div>
+          <div class="field two-col">
+            <div><label>Start date</label><input name="start_date" type="date" /></div>
+            <div><label>End date</label><input name="end_date" type="date" /></div>
+          </div>
+          <div class="field"><label>Place ID (optional — numeric id of an existing Place)</label><input name="place_id" type="number" /></div>
+          <div class="field"><label>Description</label><textarea name="description" rows="3"></textarea></div>
+        `,
+      },
+      instantiation: {
+        title: 'Create an Instantiation',
+        endpoint: '/instantiations',
+        taxonomy: 'ric_carrier_type',
+        fields: (opts) => `
+          <div class="field"><label>Title <span class="req">*</span></label><input name="title" required /></div>
+          <div class="field two-col">
+            <div><label>Carrier type</label>${opts.typeSelect}</div>
+            <div><label>MIME type</label><input name="mime_type" placeholder="image/tiff" /></div>
+          </div>
+          <div class="field two-col">
+            <div><label>Extent value</label><input name="extent_value" type="number" step="any" /></div>
+            <div><label>Extent unit</label><input name="extent_unit" placeholder="pages, MB, minutes…" /></div>
+          </div>
+          <div class="field"><label>Parent record ID (optional — numeric id of an existing Record)</label><input name="record_id" type="number" /></div>
+          <div class="field"><label>Description</label><textarea name="description" rows="3"></textarea></div>
+          <div class="field"><label>Technical characteristics</label><textarea name="technical_characteristics" rows="2"></textarea></div>
+        `,
+      },
+      relation: {
+        title: 'Create a Relation',
+        endpoint: '/relations',
+        taxonomy: 'ric_relation_type',
+        fields: (opts) => `
+          <div class="field two-col">
+            <div><label>Subject ID <span class="req">*</span></label><input name="subject_id" type="number" required /></div>
+            <div><label>Object ID <span class="req">*</span></label><input name="object_id" type="number" required /></div>
+          </div>
+          <div class="field"><label>Relation type <span class="req">*</span></label>${opts.typeSelect}</div>
+          <div class="field two-col">
+            <div><label>Start date</label><input name="start_date" type="date" /></div>
+            <div><label>End date</label><input name="end_date" type="date" /></div>
+          </div>
+          <div class="field"><label>Certainty</label>
+            <select name="certainty">
+              <option value="">-- unspecified --</option>
+              <option value="certain">certain</option>
+              <option value="probable">probable</option>
+              <option value="possible">possible</option>
+              <option value="uncertain">uncertain</option>
+              <option value="unknown">unknown</option>
+            </select>
+          </div>
+          <div class="field"><label>Evidence</label><input name="evidence" placeholder="Citation, archival reference, or note" /></div>
+        `,
+      },
+    };
+
+    const formPanel = document.getElementById('form-panel');
+
+    async function openForm(type) {
+      const spec = FORMS[type];
+      if (!spec) return;
+      formPanel.classList.add('active');
+      formPanel.innerHTML = `<h2>${escapeHtml(spec.title)}</h2><p style="color:var(--muted); font-size:0.85rem;">Loading type choices…</p>`;
+      // Fetch taxonomy from the configured server. Falls through if the server has no taxonomy yet.
+      let typeSelect = '<input name="_type_pending" disabled placeholder="(loading…)" />';
+      try {
+        const v = await apiGet('/vocabulary/' + spec.taxonomy);
+        const items = (v && v.items) || [];
+        if (items.length) {
+          typeSelect = `<select name="${spec.taxonomy === 'ric_relation_type' ? 'relation_type' : (type === 'instantiation' ? 'carrier_type' : 'type_id')}">
+            <option value="">-- pick a type --</option>
+            ${items.map(it => `<option value="${escapeHtml(it.code)}">${escapeHtml(it.label)}</option>`).join('')}
+          </select>`;
+        } else {
+          typeSelect = `<input name="${type === 'instantiation' ? 'carrier_type' : 'type_id'}" placeholder="free-text type code" />`;
+        }
+      } catch (e) {
+        typeSelect = `<input name="${type === 'instantiation' ? 'carrier_type' : 'type_id'}" placeholder="free-text type code (vocabulary unreachable: ${escapeHtml(e.message)})" />`;
+      }
+      formPanel.innerHTML = `
+        <h2>${escapeHtml(spec.title)}</h2>
+        <form id="capture-form">
+          ${spec.fields({ typeSelect })}
+          <div class="actions">
+            <button type="submit" class="submit">Create via API</button>
+            <button type="button" class="cancel" id="btn-cancel-form">Cancel</button>
+          </div>
+          <div class="result" id="form-result" style="display:none;"></div>
+        </form>
+      `;
+      document.getElementById('btn-cancel-form').addEventListener('click', closeForm);
+      document.getElementById('capture-form').addEventListener('submit', (e) => submitForm(e, spec, type));
+      formPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function closeForm() {
+      formPanel.classList.remove('active');
+      formPanel.innerHTML = '';
+    }
+
+    async function submitForm(e, spec, type) {
+      e.preventDefault();
+      const form = e.target;
+      const data = {};
+      for (const el of form.elements) {
+        if (!el.name || el.name.startsWith('_')) continue;
+        if (el.value === '' || el.value == null) continue;
+        data[el.name] = el.value;
+      }
+      const resultEl = document.getElementById('form-result');
+      resultEl.className = 'result';
+      resultEl.textContent = 'Sending…';
+      resultEl.style.display = 'block';
+      try {
+        const resp = await apiPost(spec.endpoint, data);
+        resultEl.className = 'result ok';
+        const entityId = resp.id || resp?.id || '?';
+        const slug = resp.slug ? `/${resp.slug}` : '';
+        resultEl.innerHTML = `✓ Created <code>${type}</code> <strong>${escapeHtml(data.name || data.title || '(untitled)')}</strong> — id <code>${escapeHtml(String(entityId))}</code>. ${resp.href ? `<a href="${loadConfig().server + resp.href.replace(loadConfig().server, '')}" target="_blank" rel="noopener">open</a>` : ''}`;
+        pushRecent({
+          type, id: entityId, label: data.name || data.title || '(untitled)',
+          slug: resp.slug || null, href: resp.href || null,
+          at: new Date().toISOString(),
+        });
+        // Clear form for the next entry but keep the panel open.
+        form.reset();
+      } catch (err) {
+        resultEl.className = 'result err';
+        resultEl.textContent = `✗ ${err.message}`;
+      }
+    }
+
+    // --- Recent log ------------------------------------------------
+    function renderRecent() {
+      const list = loadRecent();
+      const el = document.getElementById('recent-content');
+      if (!list.length) { el.innerHTML = '<p class="empty">Nothing captured yet.</p>'; return; }
+      el.innerHTML = '<ul>' + list.map(r => {
+        const when = new Date(r.at);
+        const cfg = loadConfig();
+        const href = r.href ? (cfg.server + r.href.replace(cfg.server, '')) : null;
+        const labelHtml = href ? `<a href="${escapeHtml(href)}" target="_blank" rel="noopener">${escapeHtml(r.label)}</a>` : escapeHtml(r.label);
+        return `<li><span class="type-badge">${escapeHtml(r.type)}</span>${labelHtml} <time datetime="${when.toISOString()}">${when.toLocaleString()}</time></li>`;
+      }).join('') + '</ul>';
+    }
+    renderRecent();
+
+    document.querySelectorAll('.tile').forEach(t => {
+      t.addEventListener('click', () => openForm(t.dataset.type));
+    });
+    document.getElementById('btn-settings').addEventListener('click', () => {
+      document.getElementById('config-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      serverInput.focus();
+    });
+  </script>
+</body>
+</html>
