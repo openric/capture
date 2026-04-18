@@ -112,7 +112,7 @@
 </head>
 <body>
   <header>
-    <h1><a href="https://openric.org">OpenRiC</a> Capture <small>v0.2.0 · create · edit · delete · upload</small></h1>
+    <h1><a href="https://openric.org">OpenRiC</a> Capture <small>v0.3.0 · 6 entity types · edit · delete · upload · attach</small></h1>
     <div class="nav-right">
       <button id="btn-settings" type="button">Settings</button>
       <a href="https://viewer.openric.org" target="_blank" rel="noopener" style="font-size:0.85rem;">Viewer ↗</a>
@@ -149,6 +149,8 @@
         <option value="rule">Rule</option>
         <option value="activity">Activity</option>
         <option value="instantiation">Instantiation</option>
+        <option value="agent">Agent</option>
+        <option value="record">Record</option>
       </select>
       <input id="edit-id" type="number" placeholder="entity id — e.g. 912150" />
       <button id="btn-edit-load" type="button">Load for editing</button>
@@ -157,6 +159,16 @@
     <section>
       <h2 style="margin: 0 0 0.9rem; font-size: 1.05rem;">Create new</h2>
       <div class="tiles" id="tiles">
+        <div class="tile" data-type="record">
+          <span class="icon">📚</span>
+          <h3>Record</h3>
+          <p>Archival description (ISAD/ISAAR) — fonds, series, file, item.</p>
+        </div>
+        <div class="tile" data-type="agent">
+          <span class="icon">👤</span>
+          <h3>Agent</h3>
+          <p>Person, corporate body, or family (rico:Agent — ISAAR-CPF).</p>
+        </div>
         <div class="tile" data-type="place">
           <span class="icon">📍</span>
           <h3>Place</h3>
@@ -182,6 +194,11 @@
           <h3>Relation</h3>
           <p>Link two existing entities with a <code>rico:*</code> predicate.</p>
         </div>
+        <div class="tile" data-type="attach">
+          <span class="icon">📎</span>
+          <h3>Attach image</h3>
+          <p>Wizard: upload a file, create an Instantiation, link it to an existing entity in one go.</p>
+        </div>
       </div>
     </section>
 
@@ -203,7 +220,7 @@
     const STORAGE_KEY = 'openric-capture:config';
     const RECENT_KEY  = 'openric-capture:recent';
 
-    const TYPE_TO_PLURAL = { place: 'places', rule: 'rules', activity: 'activities', instantiation: 'instantiations', relation: 'relations' };
+    const TYPE_TO_PLURAL = { place: 'places', rule: 'rules', activity: 'activities', instantiation: 'instantiations', relation: 'relations', agent: 'agents', record: 'records' };
 
     function loadConfig() {
       try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch { return {}; }
@@ -425,6 +442,51 @@
           <div class="field"><label>Technical characteristics</label><textarea name="technical_characteristics" rows="2">${escapeHtml(data?.technical_characteristics ?? '')}</textarea></div>
         `,
       },
+      agent: {
+        title: 'Agent', endpoint: '/agents', taxonomy: null, typeField: 'entity_type_id', labelField: 'name',
+        fields: (opts, data) => `
+          <div class="field"><label>Authorised name <span class="req">*</span></label><input name="name" required value="${escapeHtml(data?.name ?? data?.authorized_form_of_name ?? '')}" /></div>
+          <div class="field two-col">
+            <div><label>Entity type (term id)</label><input name="entity_type_id" type="number" placeholder="Person, CorporateBody, Family — term id" value="${escapeHtml(data?.entity_type_id ?? '')}" /></div>
+            <div><label>Description identifier</label><input name="description_identifier" value="${escapeHtml(data?.description_identifier ?? '')}" /></div>
+          </div>
+          <div class="field"><label>Dates of existence</label><input name="dates_of_existence" placeholder="1850–1912" value="${escapeHtml(data?.dates_of_existence ?? '')}" /></div>
+          <div class="field"><label>History</label><textarea name="history" rows="4">${escapeHtml(data?.history ?? '')}</textarea></div>
+          <div class="field"><label>Places (text)</label><textarea name="places" rows="2">${escapeHtml(data?.places ?? '')}</textarea></div>
+          <div class="field two-col">
+            <div><label>Legal status</label><textarea name="legal_status" rows="2">${escapeHtml(data?.legal_status ?? '')}</textarea></div>
+            <div><label>Functions</label><textarea name="functions" rows="2">${escapeHtml(data?.functions ?? '')}</textarea></div>
+          </div>
+          <div class="field"><label>Mandates</label><textarea name="mandates" rows="2">${escapeHtml(data?.mandates ?? '')}</textarea></div>
+          <div class="field"><label>General context</label><textarea name="general_context" rows="2">${escapeHtml(data?.general_context ?? '')}</textarea></div>
+          <div class="field"><label>Sources</label><textarea name="sources" rows="2">${escapeHtml(data?.sources ?? '')}</textarea></div>
+        `,
+      },
+      record: {
+        title: 'Record', endpoint: '/records', taxonomy: null, typeField: 'level_of_description_id', labelField: 'title',
+        fields: (opts, data) => `
+          <div class="field"><label>Title <span class="req">*</span></label><input name="title" required value="${escapeHtml(data?.title ?? '')}" /></div>
+          <div class="field two-col">
+            <div><label>Identifier</label><input name="identifier" value="${escapeHtml(data?.identifier ?? '')}" /></div>
+            <div><label>Level of description (term id)</label><input name="level_of_description_id" type="number" placeholder="fonds, series, file, item — term id" value="${escapeHtml(data?.level_of_description_id ?? '')}" /></div>
+          </div>
+          <div class="field two-col">
+            <div><label>Repository ID</label><input name="repository_id" type="number" value="${escapeHtml(data?.repository_id ?? '')}" /></div>
+            <div><label>Parent record ID</label><input name="parent_id" type="number" value="${escapeHtml(data?.parent_id ?? '')}" /></div>
+          </div>
+          <div class="field"><label>Scope and content</label><textarea name="scope_and_content" rows="4">${escapeHtml(data?.scope_and_content ?? '')}</textarea></div>
+          <div class="field"><label>Extent and medium</label><textarea name="extent_and_medium" rows="2">${escapeHtml(data?.extent_and_medium ?? '')}</textarea></div>
+          <div class="field"><label>Archival history</label><textarea name="archival_history" rows="3">${escapeHtml(data?.archival_history ?? '')}</textarea></div>
+          <div class="field"><label>Acquisition</label><textarea name="acquisition" rows="2">${escapeHtml(data?.acquisition ?? '')}</textarea></div>
+          <div class="field"><label>Arrangement</label><textarea name="arrangement" rows="2">${escapeHtml(data?.arrangement ?? '')}</textarea></div>
+          <div class="field two-col">
+            <div><label>Access conditions</label><textarea name="access_conditions" rows="2">${escapeHtml(data?.access_conditions ?? '')}</textarea></div>
+            <div><label>Reproduction conditions</label><textarea name="reproduction_conditions" rows="2">${escapeHtml(data?.reproduction_conditions ?? '')}</textarea></div>
+          </div>
+          <div class="field"><label>Physical characteristics</label><textarea name="physical_characteristics" rows="2">${escapeHtml(data?.physical_characteristics ?? '')}</textarea></div>
+          <div class="field"><label>Finding aids</label><textarea name="finding_aids" rows="2">${escapeHtml(data?.finding_aids ?? '')}</textarea></div>
+        `,
+      },
       relation: {
         title: 'Relation', endpoint: '/relations', taxonomy: 'ric_relation_type', typeField: 'relation_type',
         fields: (opts, data) => `
@@ -450,12 +512,174 @@
     };
 
     const formPanel = document.getElementById('form-panel');
-    let currentContext = null;  // { mode: 'create'|'edit', type, id?, spec, existing? }
+    let currentContext = null;  // { mode: 'create'|'edit'|'attach', type, id?, spec, existing? }
+
+    // --- Attach-image wizard ---------------------------------------
+    // One-submit flow: upload file → create Instantiation → create Relation
+    // linking (subject = target entity id) → (object = new instantiation id).
+    async function openAttachWizard() {
+      currentContext = { mode: 'attach', type: 'attach' };
+      formPanel.classList.add('active');
+      formPanel.innerHTML = `<h2>📎 Attach image to existing entity <span class="mode-badge create">wizard</span></h2>
+        <p style="color:var(--muted); font-size:0.85rem;">Loading type choices…</p>`;
+
+      // Build carrier + relation dropdowns in parallel (cheap — both are cached by the server).
+      const [carrierSelect, relSelect] = await Promise.all([
+        buildTypeSelect(FORMS.instantiation, 'instantiation', ''),
+        buildTypeSelect(FORMS.relation,      'relation',      'hasInstantiation'),
+      ]);
+
+      formPanel.innerHTML = `
+        <h2>📎 Attach image to existing entity <span class="mode-badge create">wizard</span></h2>
+        <p style="color:var(--muted); font-size:0.85rem; margin-top:-0.2rem;">
+          This does three things in one submit: upload the file, create a <code>rico:Instantiation</code>,
+          and create a relation from the target entity to the new instantiation.
+        </p>
+        <form id="attach-form">
+          <div class="field two-col">
+            <div><label>Target entity type</label>
+              <select name="target_type">
+                <option value="place">Place</option>
+                <option value="rule">Rule / Mandate</option>
+                <option value="activity">Activity</option>
+                <option value="instantiation">Instantiation</option>
+                <option value="record">Information Object / Record</option>
+                <option value="agent">Agent / Actor</option>
+              </select>
+            </div>
+            <div><label>Target entity ID <span class="req">*</span></label>
+              <input name="target_id" type="number" required placeholder="e.g. 912150" />
+            </div>
+          </div>
+          <div class="field"><label>Title <span class="req">*</span> <span style="color:var(--muted);font-weight:400;">— label for the new Instantiation</span></label>
+            <input name="title" required placeholder="e.g. Front elevation photograph, 2024" />
+          </div>
+          <div class="field two-col">
+            <div><label>Carrier type</label>${carrierSelect}</div>
+            <div><label>Relation predicate</label>${relSelect}</div>
+          </div>
+          <div class="field">
+            <label>File <span class="req">*</span></label>
+            <div class="upload-block">
+              <div class="upload-row">
+                <input type="file" id="attach-file" required />
+                <button type="button" class="cancel" id="btn-clear-attach-file" style="display:none;">Clear</button>
+              </div>
+              <div class="upload-status" id="attach-status">No file selected. MIME + size auto-fill when you pick one.</div>
+              <img class="upload-preview" id="attach-preview" alt="preview" />
+            </div>
+          </div>
+          <div class="field"><label>Description (optional)</label><textarea name="description" rows="2"></textarea></div>
+          <div class="actions">
+            <button type="submit" class="submit">Upload + Create + Link</button>
+            <button type="button" class="cancel" id="btn-cancel-attach">Cancel</button>
+          </div>
+          <div class="result" id="attach-result" style="display:none;"></div>
+        </form>
+      `;
+      document.getElementById('btn-cancel-attach').addEventListener('click', closeForm);
+      document.getElementById('attach-form').addEventListener('submit', submitAttachWizard);
+      wireAttachFilePreview();
+      formPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function wireAttachFilePreview() {
+      const fileInput = document.getElementById('attach-file');
+      const clearBtn  = document.getElementById('btn-clear-attach-file');
+      const statusEl  = document.getElementById('attach-status');
+      const previewEl = document.getElementById('attach-preview');
+      fileInput.addEventListener('change', () => {
+        const file = fileInput.files?.[0];
+        if (!file) { statusEl.textContent = 'No file selected.'; clearBtn.style.display = 'none'; previewEl.style.display = 'none'; return; }
+        clearBtn.style.display = '';
+        statusEl.textContent = `Ready: ${file.name} · ${file.type || '(unknown MIME)'} · ${(file.size/1024).toFixed(1)} KB`;
+        if (file.type?.startsWith('image/')) {
+          const r = new FileReader();
+          r.onload = () => { previewEl.src = r.result; previewEl.style.display = 'block'; };
+          r.readAsDataURL(file);
+        } else {
+          previewEl.style.display = 'none';
+        }
+      });
+      clearBtn.addEventListener('click', () => { fileInput.value = ''; fileInput.dispatchEvent(new Event('change')); });
+    }
+
+    async function submitAttachWizard(e) {
+      e.preventDefault();
+      const form = e.target;
+      const fileInput = document.getElementById('attach-file');
+      const file = fileInput?.files?.[0];
+      const targetType = form.target_type.value;
+      const targetId   = form.target_id.value.trim();
+      const title      = form.title.value.trim();
+      const carrier    = form.carrier_type?.value || '';
+      const predicate  = form.relation_type?.value || 'hasInstantiation';
+      const description = form.description.value.trim();
+
+      const resultEl = document.getElementById('attach-result');
+      const say = (cls, html) => { resultEl.className = `result ${cls}`; resultEl.innerHTML = html; resultEl.style.display = 'block'; };
+
+      if (!file) { say('err', '✗ Choose a file first.'); return; }
+      if (!targetId) { say('err', '✗ Target entity id is required.'); return; }
+      if (!title)    { say('err', '✗ Title is required.'); return; }
+
+      // Step 1 — upload
+      say('info', `1/3 Uploading ${escapeHtml(file.name)}…`);
+      let up;
+      try {
+        up = await uploadFile(file, ({state, message}) => {
+          if (state === 'fallback') say('info', `1/3 Server /upload unavailable (${escapeHtml(message)}). Embedding as data URL…`);
+        });
+      } catch (err) { say('err', `✗ Upload failed: ${escapeHtml(err.message)}`); return; }
+
+      // Step 2 — create Instantiation
+      say('info', `2/3 Creating Instantiation…`);
+      const instBody = {
+        title,
+        content_url: up.url,
+        mime_type: up.mime || file.type || '',
+        extent_value: Math.max(1, Math.round(file.size / 1024)),
+        extent_unit: 'KB',
+      };
+      if (carrier)     instBody.carrier_type = carrier;
+      if (description) instBody.description  = description;
+      if (up.fallback) instBody.content_fallback = 'data-url (server /upload unavailable)';
+
+      let inst;
+      try { inst = await apiPost('/instantiations', instBody); }
+      catch (err) { say('err', `✗ Create Instantiation failed: ${escapeHtml(err.message)}`); return; }
+
+      const instId = inst.id;
+      pushRecent({ type: 'instantiation', id: instId, label: title, slug: inst.slug || null, href: inst.href || null, at: new Date().toISOString(), op: 'create' });
+
+      // Step 3 — create Relation  (target entity → instantiation)
+      say('info', `3/3 Linking ${escapeHtml(targetType)} ${escapeHtml(targetId)} → instantiation ${instId}…`);
+      const relBody = {
+        subject_id: Number(targetId),
+        object_id: instId,
+        relation_type: predicate,
+      };
+      let rel;
+      try { rel = await apiPost('/relations', relBody); }
+      catch (err) {
+        say('err', `⚠ Instantiation ${instId} was created but the relation failed: ${escapeHtml(err.message)}. You can link manually from the Relation tile.`);
+        return;
+      }
+      pushRecent({ type: 'relation', id: rel.id || null, label: `${targetType} ${targetId} → inst ${instId} (${predicate})`, slug: null, href: rel.href || null, at: new Date().toISOString(), op: 'create' });
+
+      say('ok', `✓ Attached. Instantiation <code>${instId}</code> created and linked to ${escapeHtml(targetType)} <code>${escapeHtml(targetId)}</code> via <code>${escapeHtml(predicate)}</code>.`);
+      form.reset();
+      document.getElementById('attach-preview').style.display = 'none';
+      document.getElementById('btn-clear-attach-file').style.display = 'none';
+    }
 
     // Build the <select> / fallback <input> for a form's taxonomy, optionally
     // pre-selecting a value.
     async function buildTypeSelect(spec, type, selectedValue) {
       const name = spec.typeField;
+      // Skip the vocab fetch for specs whose type field is a numeric term id
+      // (agent.entity_type_id, record.level_of_description_id) — they use plain inputs.
+      if (!spec.taxonomy) return '';
       try {
         const v = await apiGet('/vocabulary/' + spec.taxonomy);
         const items = (v && v.items) || [];
@@ -702,7 +926,10 @@
 
     // --- Wire up tiles ---------------------------------------------
     document.querySelectorAll('.tile').forEach(t => {
-      t.addEventListener('click', () => openForm(t.dataset.type));
+      t.addEventListener('click', () => {
+        if (t.dataset.type === 'attach') openAttachWizard();
+        else openForm(t.dataset.type);
+      });
     });
     document.getElementById('btn-settings').addEventListener('click', () => {
       document.getElementById('config-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
