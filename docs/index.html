@@ -3,11 +3,12 @@
   Email: johan@plainsailingisystems.co.za
   SPDX-License-Identifier: AGPL-3.0-or-later
 
-  OpenRiC Capture — a pure-browser data-entry tool for any server
-  that implements the OpenRiC Viewing API (/api/ric/v1/*). The user
-  supplies a server URL and an API key with the "write" scope; every
-  captured entity is POSTed straight to that server. No build step;
-  no backend; no Heratio assumptions. Symmetrical to @openric/viewer.
+  OpenRiC Capture — a pure-browser data-entry tool for any server that
+  implements the OpenRiC Viewing + Write API (/api/ric/v1/*). Supports
+  create, edit, delete, and file upload. The user supplies a server URL
+  and an API key with appropriate scope; every captured entity is sent
+  straight to that server. No build step; no backend on our side; no
+  Heratio assumptions. Symmetrical to @openric/viewer.
 -->
 <!doctype html>
 <html lang="en">
@@ -21,7 +22,7 @@
     :root {
       --fg: #e5e7eb; --muted: #9ca3af; --bg: #111827; --panel: #1f2937;
       --panel-alt: #0f172a; --border: #334155; --accent: #3b82f6; --accent-hover: #2563eb;
-      --ok: #10b981; --err: #ef4444;
+      --ok: #10b981; --err: #ef4444; --warn: #f59e0b;
     }
     * { box-sizing: border-box; }
     body { font-family: system-ui, -apple-system, sans-serif; margin: 0; background: var(--bg); color: var(--fg); line-height: 1.5; }
@@ -48,6 +49,13 @@
     .config-panel .status.ok { color: var(--ok); }
     .config-panel .status.err { color: var(--err); }
 
+    /* Edit-by-id bar */
+    .edit-bar { background: var(--panel-alt); border: 1px solid var(--border); border-radius: 8px; padding: 0.85rem 1rem; margin-bottom: 1.25rem; display: grid; grid-template-columns: auto auto 1fr auto; gap: 0.6rem; align-items: center; }
+    .edit-bar label { color: var(--muted); font-size: 0.82rem; font-weight: 500; }
+    .edit-bar select, .edit-bar input { background: var(--bg); color: var(--fg); border: 1px solid var(--border); padding: 0.42rem 0.55rem; border-radius: 4px; font-size: 0.88rem; font-family: monospace; }
+    .edit-bar button { background: var(--panel); color: var(--fg); border: 1px solid var(--border); padding: 0.42rem 0.9rem; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
+    .edit-bar button:hover { background: var(--border); border-color: var(--accent); }
+
     .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.9rem; margin-bottom: 2rem; }
     .tile { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 1.1rem; cursor: pointer; transition: border-color 0.15s, transform 0.15s; }
     .tile:hover { border-color: var(--accent); transform: translateY(-2px); }
@@ -57,42 +65,58 @@
 
     .form-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 1.3rem 1.5rem; margin-bottom: 2rem; display: none; }
     .form-panel.active { display: block; }
-    .form-panel h2 { margin: 0 0 1rem; font-size: 1.1rem; }
+    .form-panel h2 { margin: 0 0 0.4rem; font-size: 1.1rem; display: flex; align-items: center; gap: 0.6rem; }
+    .form-panel .mode-badge { display: inline-block; padding: 0.1rem 0.55rem; font-size: 0.7rem; border-radius: 999px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+    .form-panel .mode-badge.create { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+    .form-panel .mode-badge.edit { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+    .form-panel .target-id { font-family: monospace; font-size: 0.85rem; color: var(--muted); margin-bottom: 1rem; }
     .form-panel .field { margin-bottom: 0.85rem; }
     .form-panel .field.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
-    .form-panel .field.three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.8rem; }
     .form-panel label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.25rem; }
     .form-panel label .req { color: var(--err); }
     .form-panel input, .form-panel select, .form-panel textarea { width: 100%; background: var(--bg); color: var(--fg); border: 1px solid var(--border); padding: 0.45rem 0.6rem; border-radius: 4px; font-size: 0.88rem; font-family: inherit; }
+    .form-panel input[type="file"] { font-family: inherit; padding: 0.35rem; }
     .form-panel textarea { min-height: 70px; resize: vertical; }
-    .form-panel .actions { display: flex; gap: 0.6rem; margin-top: 1rem; }
+    .form-panel .actions { display: flex; gap: 0.6rem; margin-top: 1rem; flex-wrap: wrap; }
     .form-panel .submit { background: var(--accent); color: #fff; border: 1px solid var(--accent); padding: 0.5rem 1rem; border-radius: 4px; font-weight: 600; cursor: pointer; }
     .form-panel .submit:hover { background: var(--accent-hover); }
     .form-panel .cancel { background: transparent; color: var(--muted); border: 1px solid var(--border); padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; }
+    .form-panel .delete { background: transparent; color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4); padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin-left: auto; }
+    .form-panel .delete:hover { background: rgba(239, 68, 68, 0.1); color: var(--err); }
     .form-panel .hint { font-size: 0.76rem; color: var(--muted); margin-top: 0.25rem; }
     .form-panel .result { margin-top: 1rem; padding: 0.6rem 0.85rem; border-radius: 4px; font-size: 0.85rem; display: none; }
     .form-panel .result.ok { background: rgba(16,185,129,0.15); color: var(--ok); border: 1px solid rgba(16,185,129,0.4); display: block; }
     .form-panel .result.err { background: rgba(239,68,68,0.12); color: var(--err); border: 1px solid rgba(239,68,68,0.4); display: block; }
+    .form-panel .result.info { background: rgba(59,130,246,0.12); color: #60a5fa; border: 1px solid rgba(59,130,246,0.4); display: block; }
+
+    /* File upload block */
+    .upload-block { background: var(--bg); border: 1px dashed var(--border); border-radius: 6px; padding: 0.9rem 1rem; margin: 0.3rem 0 0.6rem; }
+    .upload-block .upload-row { display: grid; grid-template-columns: 1fr auto; gap: 0.5rem; align-items: center; }
+    .upload-block .upload-status { font-size: 0.78rem; color: var(--muted); margin-top: 0.5rem; }
+    .upload-block .upload-preview { margin-top: 0.6rem; max-width: 200px; max-height: 200px; border-radius: 4px; border: 1px solid var(--border); display: none; }
 
     .recent { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.3rem; }
     .recent h2 { margin: 0 0 0.7rem; font-size: 1rem; }
     .recent .empty { color: var(--muted); font-size: 0.85rem; }
     .recent ul { list-style: none; padding: 0; margin: 0; }
-    .recent li { display: flex; gap: 0.6rem; align-items: center; padding: 0.35rem 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
+    .recent li { display: flex; gap: 0.6rem; align-items: center; padding: 0.4rem 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
     .recent li:last-child { border-bottom: none; }
     .recent .type-badge { font-size: 0.7rem; background: var(--border); color: var(--fg); padding: 0.08rem 0.45rem; border-radius: 3px; text-transform: lowercase; }
     .recent time { color: var(--muted); font-size: 0.76rem; margin-left: auto; white-space: nowrap; }
     .recent a { color: var(--fg); }
+    .recent .edit-link { color: var(--accent); font-size: 0.78rem; margin-left: 0.4rem; cursor: pointer; }
+    .recent .edit-link:hover { text-decoration: underline; }
 
     .disclaimer { color: var(--muted); font-size: 0.78rem; text-align: center; margin-top: 2rem; line-height: 1.6; }
   </style>
 </head>
 <body>
   <header>
-    <h1><a href="https://openric.org">OpenRiC</a> Capture <small>v0.1.0 · implementation-neutral</small></h1>
+    <h1><a href="https://openric.org">OpenRiC</a> Capture <small>v0.2.0 · create · edit · delete · upload</small></h1>
     <div class="nav-right">
       <button id="btn-settings" type="button">Settings</button>
       <a href="https://viewer.openric.org" target="_blank" rel="noopener" style="font-size:0.85rem;">Viewer ↗</a>
+      <a href="https://openric.org/guides/capture.html" target="_blank" rel="noopener" style="font-size:0.85rem;">Help ↗</a>
       <a href="https://github.com/openric/capture" target="_blank" rel="noopener" style="font-size:0.85rem;">Source ↗</a>
     </div>
   </header>
@@ -103,11 +127,11 @@
       <div class="row">
         <div>
           <label for="server-url">Server base URL</label>
-          <input id="server-url" placeholder="https://heratio.theahg.co.za/api/ric/v1" />
+          <input id="server-url" placeholder="https://ric.theahg.co.za/api/ric/v1" />
         </div>
         <div>
-          <label for="api-key">API key (<code>write</code> scope)</label>
-          <input id="api-key" type="password" placeholder="paste a key with write scope" />
+          <label for="api-key">API key (<code>write</code> + <code>delete</code> scope)</label>
+          <input id="api-key" type="password" placeholder="paste a key with write + delete scopes" />
         </div>
         <div>
           <button id="btn-save-config" type="button">Save</button>
@@ -118,8 +142,20 @@
       </div>
     </div>
 
+    <div class="edit-bar">
+      <label for="edit-type">Edit existing</label>
+      <select id="edit-type">
+        <option value="place">Place</option>
+        <option value="rule">Rule</option>
+        <option value="activity">Activity</option>
+        <option value="instantiation">Instantiation</option>
+      </select>
+      <input id="edit-id" type="number" placeholder="entity id — e.g. 912150" />
+      <button id="btn-edit-load" type="button">Load for editing</button>
+    </div>
+
     <section>
-      <h2 style="margin: 0 0 0.9rem; font-size: 1.05rem;">Capture</h2>
+      <h2 style="margin: 0 0 0.9rem; font-size: 1.05rem;">Create new</h2>
       <div class="tiles" id="tiles">
         <div class="tile" data-type="place">
           <span class="icon">📍</span>
@@ -139,7 +175,7 @@
         <div class="tile" data-type="instantiation">
           <span class="icon">📄</span>
           <h3>Instantiation</h3>
-          <p>Physical / digital manifestation of a record.</p>
+          <p>Physical / digital manifestation — supports file upload.</p>
         </div>
         <div class="tile" data-type="relation">
           <span class="icon">🔗</span>
@@ -158,15 +194,16 @@
 
     <p class="disclaimer">
       OpenRiC Capture is licensed <a href="https://www.gnu.org/licenses/agpl-3.0.html">AGPL&nbsp;3.0</a>.
-      It does not include or require Heratio — any OpenRiC-conformant server
-      is a valid backend.
-      Spec: <a href="https://openric.org">openric.org</a>.
+      It does not include or require Heratio — any OpenRiC-conformant server is a valid backend.
+      Full guide: <a href="https://openric.org/guides/capture.html">openric.org/guides/capture.html</a>.
     </p>
   </main>
 
   <script>
     const STORAGE_KEY = 'openric-capture:config';
-    const RECENT_KEY = 'openric-capture:recent';
+    const RECENT_KEY  = 'openric-capture:recent';
+
+    const TYPE_TO_PLURAL = { place: 'places', rule: 'rules', activity: 'activities', instantiation: 'instantiations', relation: 'relations' };
 
     function loadConfig() {
       try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch { return {}; }
@@ -188,15 +225,14 @@
         .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
+    // --- Config panel ----------------------------------------------
     const serverInput = document.getElementById('server-url');
-    const keyInput = document.getElementById('api-key');
-    const saveBtn = document.getElementById('btn-save-config');
-    const statusEl = document.getElementById('config-status');
+    const keyInput    = document.getElementById('api-key');
+    const saveBtn     = document.getElementById('btn-save-config');
+    const statusEl    = document.getElementById('config-status');
 
-    // Seed the server field with the Heratio reference implementation
-    // — a sensible default that works out of the box.
     const initialCfg = loadConfig();
-    serverInput.value = initialCfg.server || 'https://heratio.theahg.co.za/api/ric/v1';
+    serverInput.value = initialCfg.server || 'https://ric.theahg.co.za/api/ric/v1';
     keyInput.value = initialCfg.key || '';
     renderConfigStatus();
 
@@ -241,18 +277,20 @@
     });
 
     // --- API client ------------------------------------------------
-    async function apiPost(path, body) {
+    async function apiRequest(method, path, body) {
       const cfg = loadConfig();
       if (!cfg.server) throw new Error('Server not configured — click Settings.');
-      const resp = await fetch(cfg.server + path, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          ...(cfg.key ? { 'X-API-Key': cfg.key } : {}),
-        },
-        body: JSON.stringify(body),
-      });
+      const headers = { 'Accept': 'application/json', ...(cfg.key ? { 'X-API-Key': cfg.key } : {}) };
+      const init = { method, headers };
+      if (body !== undefined && body !== null) {
+        if (body instanceof FormData) {
+          init.body = body; // let browser set Content-Type with boundary
+        } else {
+          headers['Content-Type'] = 'application/json';
+          init.body = JSON.stringify(body);
+        }
+      }
+      const resp = await fetch(cfg.server + path, init);
       const text = await resp.text();
       let parsed = null;
       try { parsed = JSON.parse(text); } catch {}
@@ -262,198 +300,379 @@
       }
       return parsed ?? {};
     }
+    const apiGet    = (path)         => apiRequest('GET', path);
+    const apiPost   = (path, body)   => apiRequest('POST', path, body);
+    const apiPatch  = (path, body)   => apiRequest('PATCH', path, body);
+    const apiDelete = (path)         => apiRequest('DELETE', path);
 
-    async function apiGet(path) {
-      const cfg = loadConfig();
-      if (!cfg.server) throw new Error('Server not configured.');
-      const resp = await fetch(cfg.server + path, {
-        headers: { 'Accept': 'application/json', ...(cfg.key ? { 'X-API-Key': cfg.key } : {}) },
-      });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      return resp.json();
+    /**
+     * Upload a File to the configured server's /upload endpoint and return
+     * {id, url, mime, size, filename}. Falls back to a data-URL if the server
+     * doesn't accept uploads (410 Gone), so the Instantiation can still carry
+     * the inline content in its description.
+     */
+    async function uploadFile(file, onProgress) {
+      const form = new FormData();
+      form.append('file', file);
+      try {
+        const resp = await apiRequest('POST', '/upload', form);
+        if (onProgress) onProgress({ state: 'done', response: resp });
+        return resp;
+      } catch (e) {
+        // Graceful fallback — encode to data URL and return as a synthetic response.
+        if (onProgress) onProgress({ state: 'fallback', message: e.message });
+        const dataUrl = await new Promise((resolve, reject) => {
+          const r = new FileReader();
+          r.onload  = () => resolve(r.result);
+          r.onerror = () => reject(r.error);
+          r.readAsDataURL(file);
+        });
+        return {
+          id: null,
+          url: dataUrl,
+          mime: file.type || 'application/octet-stream',
+          size: file.size,
+          filename: file.name,
+          fallback: true,
+        };
+      }
     }
 
-    // --- Forms -----------------------------------------------------
+    // --- Form specs ------------------------------------------------
+    // Each form spec defines the HTML fields, the primary label key (for
+    // Recent-captures display), the taxonomy to hydrate the type picker,
+    // and which type field name to use. `supportsUpload` attaches the file
+    // upload block to the Instantiation form.
+
     const FORMS = {
       place: {
-        title: 'Create a Place',
-        endpoint: '/places',
-        taxonomy: 'ric_place_type',
-        fields: (opts) => `
-          <div class="field"><label>Name <span class="req">*</span></label><input name="name" required /></div>
+        title: 'Place',   endpoint: '/places',   taxonomy: 'ric_place_type',    typeField: 'type_id',     labelField: 'name',
+        fields: (opts, data) => `
+          <div class="field"><label>Name <span class="req">*</span></label><input name="name" required value="${escapeHtml(data?.name ?? '')}" /></div>
           <div class="field two-col">
             <div><label>Type</label>${opts.typeSelect}</div>
-            <div><label>Authority URI</label><input name="authority_uri" type="url" placeholder="https://www.geonames.org/..." /></div>
+            <div><label>Authority URI</label><input name="authority_uri" type="url" value="${escapeHtml(data?.authority_uri ?? '')}" placeholder="https://www.geonames.org/..." /></div>
           </div>
           <div class="field two-col">
-            <div><label>Latitude</label><input name="latitude" type="number" step="any" /></div>
-            <div><label>Longitude</label><input name="longitude" type="number" step="any" /></div>
+            <div><label>Latitude</label><input name="latitude" type="number" step="any" value="${escapeHtml(data?.latitude ?? '')}" /></div>
+            <div><label>Longitude</label><input name="longitude" type="number" step="any" value="${escapeHtml(data?.longitude ?? '')}" /></div>
           </div>
-          <div class="field"><label>Address</label><textarea name="address" rows="2"></textarea></div>
-          <div class="field"><label>Description</label><textarea name="description" rows="3"></textarea></div>
+          <div class="field"><label>Address</label><textarea name="address" rows="2">${escapeHtml(data?.address ?? '')}</textarea></div>
+          <div class="field"><label>Description</label><textarea name="description" rows="3">${escapeHtml(data?.description ?? '')}</textarea></div>
         `,
       },
       rule: {
-        title: 'Create a Rule / Mandate',
-        endpoint: '/rules',
-        taxonomy: 'ric_rule_type',
-        fields: (opts) => `
-          <div class="field"><label>Title <span class="req">*</span></label><input name="title" required /></div>
+        title: 'Rule / Mandate', endpoint: '/rules', taxonomy: 'ric_rule_type', typeField: 'type_id', labelField: 'title',
+        fields: (opts, data) => `
+          <div class="field"><label>Title <span class="req">*</span></label><input name="title" required value="${escapeHtml(data?.title ?? '')}" /></div>
           <div class="field two-col">
             <div><label>Type</label>${opts.typeSelect}</div>
-            <div><label>Jurisdiction</label><input name="jurisdiction" /></div>
+            <div><label>Jurisdiction</label><input name="jurisdiction" value="${escapeHtml(data?.jurisdiction ?? '')}" /></div>
           </div>
           <div class="field two-col">
-            <div><label>Start date</label><input name="start_date" type="date" /></div>
-            <div><label>End date</label><input name="end_date" type="date" /></div>
+            <div><label>Start date</label><input name="start_date" type="date" value="${escapeHtml(data?.start_date ?? '')}" /></div>
+            <div><label>End date</label><input name="end_date" type="date" value="${escapeHtml(data?.end_date ?? '')}" /></div>
           </div>
-          <div class="field"><label>Authority URI</label><input name="authority_uri" type="url" /></div>
-          <div class="field"><label>Description</label><textarea name="description" rows="3"></textarea></div>
-          <div class="field"><label>Legislation</label><textarea name="legislation" rows="2"></textarea></div>
-          <div class="field"><label>Sources</label><textarea name="sources" rows="2"></textarea></div>
+          <div class="field"><label>Authority URI</label><input name="authority_uri" type="url" value="${escapeHtml(data?.authority_uri ?? '')}" /></div>
+          <div class="field"><label>Description</label><textarea name="description" rows="3">${escapeHtml(data?.description ?? '')}</textarea></div>
+          <div class="field"><label>Legislation</label><textarea name="legislation" rows="2">${escapeHtml(data?.legislation ?? '')}</textarea></div>
+          <div class="field"><label>Sources</label><textarea name="sources" rows="2">${escapeHtml(data?.sources ?? '')}</textarea></div>
         `,
       },
       activity: {
-        title: 'Create an Activity',
-        endpoint: '/activities',
-        taxonomy: 'ric_activity_type',
-        fields: (opts) => `
-          <div class="field"><label>Name <span class="req">*</span></label><input name="name" required /></div>
+        title: 'Activity', endpoint: '/activities', taxonomy: 'ric_activity_type', typeField: 'type_id', labelField: 'name',
+        fields: (opts, data) => `
+          <div class="field"><label>Name <span class="req">*</span></label><input name="name" required value="${escapeHtml(data?.name ?? '')}" /></div>
           <div class="field two-col">
             <div><label>Type</label>${opts.typeSelect}</div>
-            <div><label>Date display</label><input name="date_display" placeholder="c. 2400 BC" /></div>
+            <div><label>Date display</label><input name="date_display" placeholder="c. 2400 BC" value="${escapeHtml(data?.date_display ?? '')}" /></div>
           </div>
           <div class="field two-col">
-            <div><label>Start date</label><input name="start_date" type="date" /></div>
-            <div><label>End date</label><input name="end_date" type="date" /></div>
+            <div><label>Start date</label><input name="start_date" type="date" value="${escapeHtml(data?.start_date ?? '')}" /></div>
+            <div><label>End date</label><input name="end_date" type="date" value="${escapeHtml(data?.end_date ?? '')}" /></div>
           </div>
-          <div class="field"><label>Place ID (optional — numeric id of an existing Place)</label><input name="place_id" type="number" /></div>
-          <div class="field"><label>Description</label><textarea name="description" rows="3"></textarea></div>
+          <div class="field"><label>Place ID (optional — numeric id of an existing Place)</label><input name="place_id" type="number" value="${escapeHtml(data?.place_id ?? '')}" /></div>
+          <div class="field"><label>Description</label><textarea name="description" rows="3">${escapeHtml(data?.description ?? '')}</textarea></div>
         `,
       },
       instantiation: {
-        title: 'Create an Instantiation',
-        endpoint: '/instantiations',
-        taxonomy: 'ric_carrier_type',
-        fields: (opts) => `
-          <div class="field"><label>Title <span class="req">*</span></label><input name="title" required /></div>
+        title: 'Instantiation', endpoint: '/instantiations', taxonomy: 'ric_carrier_type', typeField: 'carrier_type', labelField: 'title',
+        supportsUpload: true,
+        fields: (opts, data) => `
+          <div class="field"><label>Title <span class="req">*</span></label><input name="title" required value="${escapeHtml(data?.title ?? '')}" /></div>
           <div class="field two-col">
             <div><label>Carrier type</label>${opts.typeSelect}</div>
-            <div><label>MIME type</label><input name="mime_type" placeholder="image/tiff" /></div>
+            <div><label>MIME type</label><input name="mime_type" placeholder="image/tiff" value="${escapeHtml(data?.mime_type ?? '')}" /></div>
           </div>
           <div class="field two-col">
-            <div><label>Extent value</label><input name="extent_value" type="number" step="any" /></div>
-            <div><label>Extent unit</label><input name="extent_unit" placeholder="pages, MB, minutes…" /></div>
+            <div><label>Extent value</label><input name="extent_value" type="number" step="any" value="${escapeHtml(data?.extent_value ?? '')}" /></div>
+            <div><label>Extent unit</label><input name="extent_unit" placeholder="pages, MB, minutes…" value="${escapeHtml(data?.extent_unit ?? '')}" /></div>
           </div>
-          <div class="field"><label>Parent record ID (optional — numeric id of an existing Record)</label><input name="record_id" type="number" /></div>
-          <div class="field"><label>Description</label><textarea name="description" rows="3"></textarea></div>
-          <div class="field"><label>Technical characteristics</label><textarea name="technical_characteristics" rows="2"></textarea></div>
+          <div class="field"><label>Parent record ID (optional)</label><input name="record_id" type="number" value="${escapeHtml(data?.record_id ?? '')}" /></div>
+          <div class="field"><label>Content URL (optional — link to the bitstream stored elsewhere)</label><input name="content_url" type="url" placeholder="https://..." value="${escapeHtml(data?.content_url ?? '')}" /></div>
+          <div class="field">
+            <label>Upload file (optional — image, PDF, audio, any binary)</label>
+            <div class="upload-block">
+              <div class="upload-row">
+                <input type="file" id="inst-file" />
+                <button type="button" class="cancel" id="btn-clear-file" style="display:none;">Clear</button>
+              </div>
+              <div class="upload-status" id="upload-status">No file selected. MIME type + extent are auto-filled from the file metadata.</div>
+              <img class="upload-preview" id="upload-preview" alt="preview" />
+            </div>
+          </div>
+          <div class="field"><label>Description</label><textarea name="description" rows="3">${escapeHtml(data?.description ?? '')}</textarea></div>
+          <div class="field"><label>Technical characteristics</label><textarea name="technical_characteristics" rows="2">${escapeHtml(data?.technical_characteristics ?? '')}</textarea></div>
         `,
       },
       relation: {
-        title: 'Create a Relation',
-        endpoint: '/relations',
-        taxonomy: 'ric_relation_type',
-        fields: (opts) => `
+        title: 'Relation', endpoint: '/relations', taxonomy: 'ric_relation_type', typeField: 'relation_type',
+        fields: (opts, data) => `
           <div class="field two-col">
-            <div><label>Subject ID <span class="req">*</span></label><input name="subject_id" type="number" required /></div>
-            <div><label>Object ID <span class="req">*</span></label><input name="object_id" type="number" required /></div>
+            <div><label>Subject ID <span class="req">*</span></label><input name="subject_id" type="number" required value="${escapeHtml(data?.subject_id ?? '')}" /></div>
+            <div><label>Object ID <span class="req">*</span></label><input name="object_id" type="number" required value="${escapeHtml(data?.object_id ?? '')}" /></div>
           </div>
           <div class="field"><label>Relation type <span class="req">*</span></label>${opts.typeSelect}</div>
           <div class="field two-col">
-            <div><label>Start date</label><input name="start_date" type="date" /></div>
-            <div><label>End date</label><input name="end_date" type="date" /></div>
+            <div><label>Start date</label><input name="start_date" type="date" value="${escapeHtml(data?.start_date ?? '')}" /></div>
+            <div><label>End date</label><input name="end_date" type="date" value="${escapeHtml(data?.end_date ?? '')}" /></div>
           </div>
           <div class="field"><label>Certainty</label>
             <select name="certainty">
               <option value="">-- unspecified --</option>
-              <option value="certain">certain</option>
-              <option value="probable">probable</option>
-              <option value="possible">possible</option>
-              <option value="uncertain">uncertain</option>
-              <option value="unknown">unknown</option>
+              ${['certain','probable','possible','uncertain','unknown'].map(c =>
+                `<option value="${c}"${data?.certainty === c ? ' selected' : ''}>${c}</option>`).join('')}
             </select>
           </div>
-          <div class="field"><label>Evidence</label><input name="evidence" placeholder="Citation, archival reference, or note" /></div>
+          <div class="field"><label>Evidence</label><input name="evidence" placeholder="Citation, archival reference, or note" value="${escapeHtml(data?.evidence ?? '')}" /></div>
         `,
       },
     };
 
     const formPanel = document.getElementById('form-panel');
+    let currentContext = null;  // { mode: 'create'|'edit', type, id?, spec, existing? }
 
-    async function openForm(type) {
-      const spec = FORMS[type];
-      if (!spec) return;
-      formPanel.classList.add('active');
-      formPanel.innerHTML = `<h2>${escapeHtml(spec.title)}</h2><p style="color:var(--muted); font-size:0.85rem;">Loading type choices…</p>`;
-      // Fetch taxonomy from the configured server. Falls through if the server has no taxonomy yet.
-      let typeSelect = '<input name="_type_pending" disabled placeholder="(loading…)" />';
+    // Build the <select> / fallback <input> for a form's taxonomy, optionally
+    // pre-selecting a value.
+    async function buildTypeSelect(spec, type, selectedValue) {
+      const name = spec.typeField;
       try {
         const v = await apiGet('/vocabulary/' + spec.taxonomy);
         const items = (v && v.items) || [];
         if (items.length) {
-          typeSelect = `<select name="${spec.taxonomy === 'ric_relation_type' ? 'relation_type' : (type === 'instantiation' ? 'carrier_type' : 'type_id')}">
+          return `<select name="${name}">
             <option value="">-- pick a type --</option>
-            ${items.map(it => `<option value="${escapeHtml(it.code)}">${escapeHtml(it.label)}</option>`).join('')}
+            ${items.map(it =>
+              `<option value="${escapeHtml(it.code)}"${selectedValue === it.code ? ' selected' : ''}>${escapeHtml(it.label)}</option>`
+            ).join('')}
           </select>`;
-        } else {
-          typeSelect = `<input name="${type === 'instantiation' ? 'carrier_type' : 'type_id'}" placeholder="free-text type code" />`;
         }
-      } catch (e) {
-        typeSelect = `<input name="${type === 'instantiation' ? 'carrier_type' : 'type_id'}" placeholder="free-text type code (vocabulary unreachable: ${escapeHtml(e.message)})" />`;
-      }
+      } catch {}
+      return `<input name="${name}" placeholder="free-text type code" value="${escapeHtml(selectedValue ?? '')}" />`;
+    }
+
+    async function openForm(type, editContext) {
+      const spec = FORMS[type];
+      if (!spec) return;
+      const mode = editContext ? 'edit' : 'create';
+      currentContext = { mode, type, spec, id: editContext?.id, existing: editContext?.data };
+
+      formPanel.classList.add('active');
+      formPanel.innerHTML = `<h2>${mode === 'edit' ? '✏️ Edit' : '✨ Create'} ${escapeHtml(spec.title)} <span class="mode-badge ${mode}">${mode}</span></h2>
+        ${editContext ? `<div class="target-id">editing <code>${escapeHtml(type)}</code> id <code>${escapeHtml(editContext.id)}</code></div>` : ''}
+        <p style="color:var(--muted); font-size:0.85rem;">Loading type choices…</p>`;
+
+      const data = editContext?.data || {};
+      const typeSelect = await buildTypeSelect(spec, type, data[spec.typeField]);
+
       formPanel.innerHTML = `
-        <h2>${escapeHtml(spec.title)}</h2>
+        <h2>${mode === 'edit' ? '✏️ Edit' : '✨ Create'} ${escapeHtml(spec.title)} <span class="mode-badge ${mode}">${mode}</span></h2>
+        ${editContext ? `<div class="target-id">editing <code>${escapeHtml(type)}</code> id <code>${escapeHtml(editContext.id)}</code></div>` : ''}
         <form id="capture-form">
-          ${spec.fields({ typeSelect })}
+          ${spec.fields({ typeSelect }, data)}
           <div class="actions">
-            <button type="submit" class="submit">Create via API</button>
+            <button type="submit" class="submit">${mode === 'edit' ? 'Save changes' : 'Create via API'}</button>
             <button type="button" class="cancel" id="btn-cancel-form">Cancel</button>
+            ${mode === 'edit' ? `<button type="button" class="delete" id="btn-delete-entity">Delete</button>` : ''}
           </div>
           <div class="result" id="form-result" style="display:none;"></div>
         </form>
       `;
       document.getElementById('btn-cancel-form').addEventListener('click', closeForm);
-      document.getElementById('capture-form').addEventListener('submit', (e) => submitForm(e, spec, type));
+      document.getElementById('capture-form').addEventListener('submit', submitForm);
+      if (mode === 'edit') {
+        document.getElementById('btn-delete-entity').addEventListener('click', deleteCurrentEntity);
+      }
+      if (spec.supportsUpload) wireUpload();
       formPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
     function closeForm() {
       formPanel.classList.remove('active');
       formPanel.innerHTML = '';
+      currentContext = null;
     }
 
-    async function submitForm(e, spec, type) {
+    // --- File upload wiring (Instantiation only) -------------------
+    function wireUpload() {
+      const fileInput   = document.getElementById('inst-file');
+      const clearBtn    = document.getElementById('btn-clear-file');
+      const statusEl    = document.getElementById('upload-status');
+      const previewEl   = document.getElementById('upload-preview');
+      if (!fileInput) return;
+      fileInput.addEventListener('change', () => {
+        const file = fileInput.files?.[0];
+        if (!file) { statusEl.textContent = 'No file selected.'; clearBtn.style.display = 'none'; previewEl.style.display = 'none'; return; }
+        clearBtn.style.display = '';
+        statusEl.textContent = `Ready: ${file.name} · ${file.type || '(unknown MIME)'} · ${(file.size/1024).toFixed(1)} KB — will be uploaded when you submit.`;
+        // Auto-fill MIME and extent
+        const form = document.getElementById('capture-form');
+        if (!form.mime_type.value) form.mime_type.value = file.type || '';
+        if (!form.extent_value.value && !form.extent_unit.value) {
+          form.extent_value.value = Math.max(1, Math.round(file.size / 1024));
+          form.extent_unit.value = 'KB';
+        }
+        // Image preview
+        if (file.type && file.type.startsWith('image/')) {
+          const r = new FileReader();
+          r.onload = () => { previewEl.src = r.result; previewEl.style.display = 'block'; };
+          r.readAsDataURL(file);
+        } else {
+          previewEl.style.display = 'none';
+        }
+      });
+      clearBtn.addEventListener('click', () => {
+        fileInput.value = '';
+        fileInput.dispatchEvent(new Event('change'));
+      });
+    }
+
+    // --- Submit (both create + update) -----------------------------
+    async function submitForm(e) {
       e.preventDefault();
+      if (!currentContext) return;
+      const { mode, type, spec, id } = currentContext;
       const form = e.target;
+
       const data = {};
       for (const el of form.elements) {
         if (!el.name || el.name.startsWith('_')) continue;
         if (el.value === '' || el.value == null) continue;
         data[el.name] = el.value;
       }
+
       const resultEl = document.getElementById('form-result');
-      resultEl.className = 'result';
-      resultEl.textContent = 'Sending…';
+      resultEl.className = 'result info';
+      resultEl.textContent = mode === 'edit' ? 'Saving changes…' : 'Sending…';
       resultEl.style.display = 'block';
+
+      // Upload (Instantiation only)
+      if (spec.supportsUpload) {
+        const fileInput = document.getElementById('inst-file');
+        const file = fileInput?.files?.[0];
+        if (file) {
+          resultEl.textContent = `Uploading ${file.name}…`;
+          try {
+            const up = await uploadFile(file, ({state, message}) => {
+              if (state === 'fallback') resultEl.textContent = `Server /upload unavailable (${message}). Embedding as data URL.`;
+            });
+            data.content_url = up.url;
+            if (!data.mime_type && up.mime) data.mime_type = up.mime;
+            if (up.fallback) data.content_fallback = 'data-url (server /upload unavailable)';
+          } catch (err) {
+            resultEl.className = 'result err';
+            resultEl.textContent = `✗ Upload failed: ${err.message}`;
+            return;
+          }
+        }
+      }
+
       try {
-        const resp = await apiPost(spec.endpoint, data);
-        resultEl.className = 'result ok';
-        const entityId = resp.id || resp?.id || '?';
-        const slug = resp.slug ? `/${resp.slug}` : '';
-        resultEl.innerHTML = `✓ Created <code>${type}</code> <strong>${escapeHtml(data.name || data.title || '(untitled)')}</strong> — id <code>${escapeHtml(String(entityId))}</code>. ${resp.href ? `<a href="${loadConfig().server + resp.href.replace(loadConfig().server, '')}" target="_blank" rel="noopener">open</a>` : ''}`;
-        pushRecent({
-          type, id: entityId, label: data.name || data.title || '(untitled)',
-          slug: resp.slug || null, href: resp.href || null,
-          at: new Date().toISOString(),
-        });
-        // Clear form for the next entry but keep the panel open.
-        form.reset();
+        const plural = TYPE_TO_PLURAL[type] || (type + 's');
+        const label = data[spec.labelField] || `${type} #${id || 'new'}`;
+        if (mode === 'edit') {
+          await apiPatch(`${spec.endpoint}/${id}`, data);
+          resultEl.className = 'result ok';
+          resultEl.innerHTML = `✓ Updated <code>${type}</code> <strong>${escapeHtml(label)}</strong>.`;
+          pushRecent({ type, id, label, slug: null, href: `/api/ric/v1/${plural}/${id}`, at: new Date().toISOString(), op: 'edit' });
+        } else {
+          const resp = await apiPost(spec.endpoint, data);
+          const newId = resp.id;
+          resultEl.className = 'result ok';
+          resultEl.innerHTML = `✓ Created <code>${type}</code> <strong>${escapeHtml(label)}</strong> — id <code>${escapeHtml(String(newId))}</code>. ${resp.href ? `<a href="${loadConfig().server + resp.href.replace(loadConfig().server,'')}" target="_blank" rel="noopener">open</a>` : ''}`;
+          pushRecent({ type, id: newId, label, slug: resp.slug || null, href: resp.href || null, at: new Date().toISOString(), op: 'create' });
+          form.reset();
+        }
       } catch (err) {
         resultEl.className = 'result err';
         resultEl.textContent = `✗ ${err.message}`;
       }
     }
+
+    // --- Delete ----------------------------------------------------
+    async function deleteCurrentEntity() {
+      if (!currentContext || currentContext.mode !== 'edit') return;
+      const { type, id } = currentContext;
+      if (!confirm(`Delete this ${type} (id ${id})? This cannot be undone.`)) return;
+
+      const resultEl = document.getElementById('form-result');
+      resultEl.className = 'result info';
+      resultEl.textContent = 'Deleting…';
+      resultEl.style.display = 'block';
+      try {
+        const plural = TYPE_TO_PLURAL[type] || (type + 's');
+        await apiDelete(`/${plural}/${id}`);
+        resultEl.className = 'result ok';
+        resultEl.textContent = `✓ Deleted ${type} ${id}.`;
+        pushRecent({ type, id, label: `(deleted ${type} #${id})`, slug: null, href: null, at: new Date().toISOString(), op: 'delete' });
+        setTimeout(closeForm, 1200);
+      } catch (err) {
+        resultEl.className = 'result err';
+        resultEl.textContent = `✗ ${err.message}`;
+      }
+    }
+
+    // --- Edit-by-id bar -------------------------------------------
+    const editType  = document.getElementById('edit-type');
+    const editIdEl  = document.getElementById('edit-id');
+    const editLoad  = document.getElementById('btn-edit-load');
+
+    async function loadForEditing(type, id) {
+      const spec = FORMS[type];
+      if (!spec) throw new Error(`Unknown type: ${type}`);
+      const plural = TYPE_TO_PLURAL[type] || (type + 's');
+      const data = await apiGet(`${spec.endpoint}/${id}`);
+      // Server may return JSON-LD with rico:* / openric:* keys or a plain
+      // object with native DB column names. Prefer native keys; fall back
+      // to common JSON-LD shapes.
+      const native = {};
+      for (const [k, v] of Object.entries(data || {})) {
+        if (k.startsWith('@') || k.includes(':')) continue;
+        native[k] = v;
+      }
+      // Some endpoints wrap the entity in {data: {...}} or {entity: {...}} — unwrap.
+      if (native.data && typeof native.data === 'object') Object.assign(native, native.data);
+      if (native.entity && typeof native.entity === 'object') Object.assign(native, native.entity);
+      return native;
+    }
+
+    editLoad.addEventListener('click', async () => {
+      const type = editType.value;
+      const id = editIdEl.value.trim();
+      if (!id) { alert('Enter an entity id first.'); return; }
+      editLoad.disabled = true;
+      editLoad.textContent = 'Loading…';
+      try {
+        const data = await loadForEditing(type, id);
+        openForm(type, { id, data });
+      } catch (err) {
+        alert(`Could not load ${type} ${id}: ${err.message}`);
+      } finally {
+        editLoad.disabled = false;
+        editLoad.textContent = 'Load for editing';
+      }
+    });
+    editIdEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') editLoad.click(); });
 
     // --- Recent log ------------------------------------------------
     function renderRecent() {
@@ -463,13 +682,25 @@
       el.innerHTML = '<ul>' + list.map(r => {
         const when = new Date(r.at);
         const cfg = loadConfig();
-        const href = r.href ? (cfg.server + r.href.replace(cfg.server, '')) : null;
+        const href = r.href ? (r.href.startsWith('http') ? r.href : (cfg.server.replace(/\/api\/ric\/v1$/, '') + r.href)) : null;
         const labelHtml = href ? `<a href="${escapeHtml(href)}" target="_blank" rel="noopener">${escapeHtml(r.label)}</a>` : escapeHtml(r.label);
-        return `<li><span class="type-badge">${escapeHtml(r.type)}</span>${labelHtml} <time datetime="${when.toISOString()}">${when.toLocaleString()}</time></li>`;
+        const opBadge = r.op === 'edit' ? ' ✎' : r.op === 'delete' ? ' ✗' : '';
+        const editLink = (r.op !== 'delete' && r.type !== 'relation') ? `<a class="edit-link" data-type="${escapeHtml(r.type)}" data-id="${escapeHtml(String(r.id))}">edit</a>` : '';
+        return `<li><span class="type-badge">${escapeHtml(r.type)}${opBadge}</span>${labelHtml}${editLink}<time datetime="${when.toISOString()}">${when.toLocaleString()}</time></li>`;
       }).join('') + '</ul>';
+
+      el.querySelectorAll('.edit-link').forEach(a => {
+        a.addEventListener('click', async (e) => {
+          e.preventDefault();
+          editType.value = a.dataset.type;
+          editIdEl.value = a.dataset.id;
+          editLoad.click();
+        });
+      });
     }
     renderRecent();
 
+    // --- Wire up tiles ---------------------------------------------
     document.querySelectorAll('.tile').forEach(t => {
       t.addEventListener('click', () => openForm(t.dataset.type));
     });
