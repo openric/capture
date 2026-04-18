@@ -112,7 +112,7 @@
 </head>
 <body>
   <header>
-    <h1><a href="https://openric.org">OpenRiC</a> Capture <small>v0.3.0 · 6 entity types · edit · delete · upload · attach</small></h1>
+    <h1><a href="https://openric.org">OpenRiC</a> Capture <small>v0.4.0 · 8 entity types · edit · delete · upload · attach</small></h1>
     <div class="nav-right">
       <button id="btn-settings" type="button">Settings</button>
       <a href="https://viewer.openric.org" target="_blank" rel="noopener" style="font-size:0.85rem;">Viewer ↗</a>
@@ -151,6 +151,8 @@
         <option value="instantiation">Instantiation</option>
         <option value="agent">Agent</option>
         <option value="record">Record</option>
+        <option value="repository">Repository</option>
+        <option value="function">Function</option>
       </select>
       <input id="edit-id" type="number" placeholder="entity id — e.g. 912150" />
       <button id="btn-edit-load" type="button">Load for editing</button>
@@ -168,6 +170,16 @@
           <span class="icon">👤</span>
           <h3>Agent</h3>
           <p>Person, corporate body, or family (rico:Agent — ISAAR-CPF).</p>
+        </div>
+        <div class="tile" data-type="repository">
+          <span class="icon">🏛️</span>
+          <h3>Repository</h3>
+          <p>Custodial institution (ISDIAH) — archive, library, museum.</p>
+        </div>
+        <div class="tile" data-type="function">
+          <span class="icon">⚙️</span>
+          <h3>Function</h3>
+          <p>Administrative function (ISDF) — the purpose records support.</p>
         </div>
         <div class="tile" data-type="place">
           <span class="icon">📍</span>
@@ -220,7 +232,7 @@
     const STORAGE_KEY = 'openric-capture:config';
     const RECENT_KEY  = 'openric-capture:recent';
 
-    const TYPE_TO_PLURAL = { place: 'places', rule: 'rules', activity: 'activities', instantiation: 'instantiations', relation: 'relations', agent: 'agents', record: 'records' };
+    const TYPE_TO_PLURAL = { place: 'places', rule: 'rules', activity: 'activities', instantiation: 'instantiations', relation: 'relations', agent: 'agents', record: 'records', repository: 'repositories', function: 'functions' };
 
     function loadConfig() {
       try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch { return {}; }
@@ -485,6 +497,48 @@
           </div>
           <div class="field"><label>Physical characteristics</label><textarea name="physical_characteristics" rows="2">${escapeHtml(data?.physical_characteristics ?? '')}</textarea></div>
           <div class="field"><label>Finding aids</label><textarea name="finding_aids" rows="2">${escapeHtml(data?.finding_aids ?? '')}</textarea></div>
+        `,
+      },
+      repository: {
+        title: 'Repository', endpoint: '/repositories', taxonomy: null, typeField: 'entity_type_id', labelField: 'name',
+        fields: (opts, data) => `
+          <div class="field"><label>Authorised name <span class="req">*</span></label><input name="name" required value="${escapeHtml(data?.name ?? data?.authorized_form_of_name ?? '')}" /></div>
+          <div class="field two-col">
+            <div><label>Identifier</label><input name="identifier" value="${escapeHtml(data?.identifier ?? '')}" /></div>
+            <div><label>Upload limit (MB)</label><input name="upload_limit" type="number" step="any" value="${escapeHtml(data?.upload_limit ?? '')}" /></div>
+          </div>
+          <div class="field"><label>History</label><textarea name="history" rows="3">${escapeHtml(data?.history ?? '')}</textarea></div>
+          <div class="field two-col">
+            <div><label>Geocultural context</label><textarea name="geocultural_context" rows="2">${escapeHtml(data?.geocultural_context ?? '')}</textarea></div>
+            <div><label>Collecting policies</label><textarea name="collecting_policies" rows="2">${escapeHtml(data?.collecting_policies ?? '')}</textarea></div>
+          </div>
+          <div class="field two-col">
+            <div><label>Buildings</label><textarea name="buildings" rows="2">${escapeHtml(data?.buildings ?? '')}</textarea></div>
+            <div><label>Holdings</label><textarea name="holdings" rows="2">${escapeHtml(data?.holdings ?? '')}</textarea></div>
+          </div>
+          <div class="field"><label>Finding aids</label><textarea name="finding_aids" rows="2">${escapeHtml(data?.finding_aids ?? '')}</textarea></div>
+          <div class="field two-col">
+            <div><label>Opening times</label><textarea name="opening_times" rows="2">${escapeHtml(data?.opening_times ?? '')}</textarea></div>
+            <div><label>Access conditions</label><textarea name="access_conditions" rows="2">${escapeHtml(data?.access_conditions ?? '')}</textarea></div>
+          </div>
+          <div class="field two-col">
+            <div><label>Research services</label><textarea name="research_services" rows="2">${escapeHtml(data?.research_services ?? '')}</textarea></div>
+            <div><label>Reproduction services</label><textarea name="reproduction_services" rows="2">${escapeHtml(data?.reproduction_services ?? '')}</textarea></div>
+          </div>
+        `,
+      },
+      function: {
+        title: 'Function', endpoint: '/functions', taxonomy: null, typeField: 'type_id', labelField: 'name',
+        fields: (opts, data) => `
+          <div class="field"><label>Authorised name <span class="req">*</span></label><input name="name" required value="${escapeHtml(data?.name ?? data?.authorized_form_of_name ?? '')}" /></div>
+          <div class="field two-col">
+            <div><label>Type (term id)</label><input name="type_id" type="number" value="${escapeHtml(data?.type_id ?? '')}" /></div>
+            <div><label>Classification</label><input name="classification" value="${escapeHtml(data?.classification ?? '')}" /></div>
+          </div>
+          <div class="field"><label>Dates</label><input name="dates" placeholder="1900–1950" value="${escapeHtml(data?.dates ?? '')}" /></div>
+          <div class="field"><label>Description</label><textarea name="description" rows="3">${escapeHtml(data?.description ?? '')}</textarea></div>
+          <div class="field"><label>History</label><textarea name="history" rows="3">${escapeHtml(data?.history ?? '')}</textarea></div>
+          <div class="field"><label>Legislation</label><textarea name="legislation" rows="2">${escapeHtml(data?.legislation ?? '')}</textarea></div>
         `,
       },
       relation: {
