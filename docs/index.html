@@ -169,17 +169,17 @@
         <div class="tile" data-type="agent">
           <span class="icon">👤</span>
           <h3>Agent</h3>
-          <p>Person, corporate body, or family (rico:Agent — ISAAR-CPF).</p>
+          <p>Person, corporate body, family, or mechanism (software/AI system) — <code>rico:Agent</code> family per ISAAR-CPF + spec v0.37 §6.2.</p>
         </div>
         <div class="tile" data-type="repository">
           <span class="icon">🏛️</span>
           <h3>Repository</h3>
-          <p>Custodial institution (ISDIAH) — archive, library, museum.</p>
+          <p>Custodial institution (ISDIAH). API convenience surface; canonical RDF: <code>rico:CorporateBody</code> with holder relations per spec v0.37 §6.3.</p>
         </div>
         <div class="tile" data-type="function">
           <span class="icon">⚙️</span>
           <h3>Function</h3>
-          <p>Administrative function (ISDF) — the purpose records support.</p>
+          <p>Administrative function (ISDF). API surface; canonical: <code>openricx:Function</code> interim — RiC-O 1.1 has no <code>rico:Function</code> class (spec v0.37 §6.4).</p>
         </div>
         <div class="tile" data-type="place">
           <span class="icon">📍</span>
@@ -189,12 +189,12 @@
         <div class="tile" data-type="rule">
           <span class="icon">⚖️</span>
           <h3>Rule / Mandate</h3>
-          <p>Legislation, retention schedule, policy.</p>
+          <p>Legislation, retention schedule, policy. Mandates are Rules with <code>hasOrHadRuleType=mandate</code> (per spec v0.37 §9).</p>
         </div>
         <div class="tile" data-type="activity">
           <span class="icon">🏃</span>
           <h3>Activity</h3>
-          <p>Production, accumulation, custody event.</p>
+          <p>Production, accumulation, custody, transfer event — every event is <code>rico:Activity</code> with a <code>hasActivityType</code> IRI from <code>https://openric.org/vocab/activity-type/</code> (spec v0.37 §6.5).</p>
         </div>
         <div class="tile" data-type="instantiation">
           <span class="icon">📄</span>
@@ -920,9 +920,16 @@
       if (!spec) throw new Error(`Unknown type: ${type}`);
       const plural = TYPE_TO_PLURAL[type] || (type + 's');
       const data = await apiGet(`${spec.endpoint}/${id}`);
-      // Server may return JSON-LD with rico:* / openric:* keys or a plain
-      // object with native DB column names. Prefer native keys; fall back
-      // to common JSON-LD shapes.
+      // Namespace-agnostic prepopulation: Capture is dual-read across the
+      // OpenRiC spec v0.37 boundary by design. Servers may return JSON-LD
+      // with any of: pre-v0.37 rico: shapes (`rico:heldBy`, `rico:hasInstantiation`,
+      // `rico:Production` as @type), v0.37+ canonical shapes
+      // (`rico:hasOrHadHolder`, `rico:hasOrHadInstantiation`, `rico:Activity` +
+      // `rico:hasActivityType`), or openricx: extension keys. Capture ignores
+      // every CURIE-prefixed key and reads only the native DB columns
+      // (`name`, `title`, `start_date`, etc.) which are stable across the
+      // spec transition. Forms POST those same native fields back; the
+      // server is responsible for mapping them to canonical JSON-LD on read.
       const native = {};
       for (const [k, v] of Object.entries(data || {})) {
         if (k.startsWith('@') || k.includes(':')) continue;
