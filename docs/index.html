@@ -47,7 +47,21 @@
     main { max-width: 1100px; margin: 0 auto; padding: 1.5rem 1.2rem 3rem; }
 
     .config-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.2rem; margin-bottom: 1.5rem; }
-    .config-panel h2 { margin: 0 0 0.6rem; font-size: 0.95rem; }
+    .config-panel > summary { cursor: pointer; font-size: 0.95rem; font-weight: 600; list-style: none; user-select: none; }
+    .config-panel > summary::-webkit-details-marker { display: none; }
+    .config-panel > summary::before { content: '\25B8  '; color: var(--muted); }
+    .config-panel[open] > summary::before { content: '\25BE  '; }
+    .config-panel > summary + * { margin-top: 0.7rem; }
+
+    /* Implementation detail on a task tile: the RDF mapping is real and
+       developers need it, but it must not be the first thing an archivist
+       reads about what a tile does. */
+    .tile details.impl { margin-top: 0.4rem; }
+    .tile details.impl > summary { cursor: pointer; font-size: 0.74rem; color: var(--muted); list-style: none; }
+    .tile details.impl > summary::-webkit-details-marker { display: none; }
+    .tile details.impl > summary::before { content: '\25B8  '; }
+    .tile details.impl[open] > summary::before { content: '\25BE  '; }
+    .tile details.impl { font-size: 0.76rem; color: var(--muted); line-height: 1.45; }
     .config-panel .row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 0.6rem; align-items: end; }
     .config-panel label { font-size: 0.78rem; color: var(--muted); display: block; }
     .config-panel input { width: 100%; background: var(--bg); color: var(--fg); border: 1px solid var(--border); padding: 0.4rem 0.55rem; border-radius: 4px; font-size: 0.88rem; font-family: monospace; }
@@ -132,8 +146,12 @@
   </header>
 
   <main>
-    <div class="config-panel" id="config-panel">
-      <h2>Connection</h2>
+    <!-- Connection is setup, not work. It opens itself when nothing is
+         configured yet and stays closed once a server is saved, so the task
+         tiles are what you see on every visit after the first. The Settings
+         button in the header opens it again. -->
+    <details class="config-panel" id="config-panel">
+      <summary>Connection</summary>
       <div class="row">
         <div>
           <label for="server-url">Server base URL</label>
@@ -150,7 +168,7 @@
       <div class="status" id="config-status">
         No server configured yet. Enter a URL + API key and click Save. The key is stored in your browser's <code>localStorage</code>, never sent anywhere except the server above.
       </div>
-    </div>
+    </details>
 
     <div class="edit-bar">
       <label for="edit-type">Edit existing</label>
@@ -174,22 +192,26 @@
         <div class="tile" data-type="record">
           <span class="icon">📚</span>
           <h3>Record</h3>
-          <p>Archival description (ISAD/ISAAR) — fonds, series, file, item.</p>
+          <p>Something the archive holds - a fonds, a series, a file, an item.</p>
+          <details class="impl"><summary>Implementation detail</summary>Maps from ISAD(G) / ISAAR(CPF) description.</details>
         </div>
         <div class="tile" data-type="agent">
           <span class="icon">👤</span>
           <h3>Agent</h3>
-          <p>Person, corporate body, family, or mechanism (software/AI system) — <code>rico:Agent</code> family per ISAAR-CPF + spec v0.37 §6.2.</p>
+          <p>A person, family, organisation, or a software or AI system that acted.</p>
+          <details class="impl"><summary>Implementation detail</summary>The <code>rico:Agent</code> family, per ISAAR(CPF). See the mapping specification.</details>
         </div>
         <div class="tile" data-type="repository">
           <span class="icon">🏛️</span>
           <h3>Repository</h3>
-          <p>Custodial institution (ISDIAH). API convenience surface; canonical RDF: <code>rico:CorporateBody</code> with holder relations per spec v0.37 §6.3.</p>
+          <p>The institution holding the material.</p>
+          <details class="impl"><summary>Implementation detail</summary>A convenience surface. Canonically a <code>rico:CorporateBody</code> with holder relations, per ISDIAH.</details>
         </div>
         <div class="tile" data-type="function">
           <span class="icon">⚙️</span>
           <h3>Function</h3>
-          <p>Administrative function (ISDF). API surface; canonical: <code>openricx:Function</code> interim — RiC-O 1.1 has no <code>rico:Function</code> class (spec v0.37 §6.4).</p>
+          <p>An ongoing responsibility, as opposed to something that happened once.</p>
+          <details class="impl"><summary>Implementation detail</summary>Per ISDF. Currently <code>openricx:Function</code> - RiC-O 1.1 defines no <code>rico:Function</code> class, so this is an interim extension term.</details>
         </div>
         <div class="tile" data-type="place">
           <span class="icon">📍</span>
@@ -199,22 +221,25 @@
         <div class="tile" data-type="rule">
           <span class="icon">⚖️</span>
           <h3>Rule / Mandate</h3>
-          <p>Legislation, retention schedule, policy. Mandates are Rules with <code>hasOrHadRuleType=mandate</code> (per spec v0.37 §9).</p>
+          <p>Legislation, a retention schedule, a policy - what authorised or constrained the records.</p>
+          <details class="impl"><summary>Implementation detail</summary>A mandate is a Rule carrying <code>hasOrHadRuleType=mandate</code>.</details>
         </div>
         <div class="tile" data-type="activity">
           <span class="icon">🏃</span>
           <h3>Activity</h3>
-          <p>Production, accumulation, custody, transfer event — every event is <code>rico:Activity</code> with a <code>hasActivityType</code> IRI from <code>https://openric.org/vocab/activity-type/</code> (spec v0.37 §6.5).</p>
+          <p>Something that happened - creation, accumulation, custody, a transfer.</p>
+          <details class="impl"><summary>Implementation detail</summary>Every one is a <code>rico:Activity</code> with a <code>hasActivityType</code> IRI from the <a href="https://openric.org/vocab/activity-type/">activity-type vocabulary</a>.</details>
         </div>
         <div class="tile" data-type="instantiation">
           <span class="icon">📄</span>
           <h3>Instantiation</h3>
-          <p>Physical / digital manifestation — supports file upload.</p>
+          <p>A physical or digital copy of something. Accepts a file upload.</p>
         </div>
         <div class="tile" data-type="relation">
           <span class="icon">🔗</span>
           <h3>Relation</h3>
-          <p>Link two existing entities with a <code>rico:*</code> predicate.</p>
+          <p>Connect two things you have already created.</p>
+          <details class="impl"><summary>Implementation detail</summary>Writes a <code>rico:*</code> predicate between the two entities.</details>
         </div>
         <div class="tile" data-type="attach">
           <span class="icon">📎</span>
@@ -274,6 +299,10 @@
     serverInput.value = initialCfg.server || 'https://ric.theahg.co.za/api/ric/v1';
     keyInput.value = initialCfg.key || '';
     renderConfigStatus();
+
+    // Open Connection only when there is nothing configured. On every visit
+    // after the first, the task tiles are what you land on.
+    document.getElementById('config-panel').open = !(initialCfg.server && initialCfg.key);
 
     function renderConfigStatus() {
       const cfg = loadConfig();
@@ -1003,6 +1032,7 @@
       });
     });
     document.getElementById('btn-settings').addEventListener('click', () => {
+      document.getElementById('config-panel').open = true;
       document.getElementById('config-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
       serverInput.focus();
     });
