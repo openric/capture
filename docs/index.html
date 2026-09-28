@@ -18,6 +18,14 @@
   <title>OpenRiC Capture</title>
   <meta name="description" content="Pure-browser data-entry tool for any OpenRiC-conformant server." />
   <link rel="canonical" href="https://capture.openric.org/" />
+
+  <!-- Shared OpenRiC shell: header, canonical entity colours and design
+       tokens, served from openric.org so the four surfaces read as one product
+       without being one deployment. Progressive enhancement - if it fails to
+       load this page keeps working, it just loses the chrome. -->
+  <link rel="stylesheet" href="https://openric.org/assets/shell/v1.css" />
+  <script defer src="https://openric.org/assets/shell/v1.js"
+          data-product="Editor" data-theme="dark" data-footer="false"></script>
   <style>
     :root {
       --fg: #e5e7eb; --muted: #9ca3af; --bg: #111827; --panel: #1f2937;
@@ -111,12 +119,14 @@
   </style>
 </head>
 <body>
+  <!-- Branding, the openric.org route back and the generic Help link now come
+       from the shared OpenRiC shell, injected above this. What remains is this
+       surface's own controls. The old h1 also hardcoded "v0.4.0" while the repo
+       was at v0.5.0 - the same version-drift disease the spec site had. -->
   <header>
-    <h1><a href="https://openric.org">OpenRiC</a> Capture <small>v0.4.0 · 8 entity types · edit · delete · upload · attach</small></h1>
     <div class="nav-right">
       <button id="btn-settings" type="button">Settings</button>
-      <a href="https://viewer.openric.org" target="_blank" rel="noopener" style="font-size:0.85rem;">Viewer ↗</a>
-      <a href="https://openric.org/guides/capture.html" target="_blank" rel="noopener" style="font-size:0.85rem;">Help ↗</a>
+      <a href="https://openric.org/guides/capture.html" target="_blank" rel="noopener" style="font-size:0.85rem;">Capture guide ↗</a>
       <a href="https://github.com/openric/capture" target="_blank" rel="noopener" style="font-size:0.85rem;">Source ↗</a>
     </div>
   </header>
