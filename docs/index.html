@@ -166,7 +166,7 @@
         </div>
       </div>
       <div class="status" id="config-status">
-        No server configured yet. Enter a URL + API key and click Save. The key is stored in your browser's <code>localStorage</code>, never sent anywhere except the server above.
+        No server configured yet. Enter a URL + API key and click Save. The key is kept for this browser session only and is sent nowhere except the server above. Use a low-privilege key you can revoke.
       </div>
     </details>
 
@@ -269,10 +269,21 @@
 
     const TYPE_TO_PLURAL = { place: 'places', rule: 'rules', activity: 'activities', instantiation: 'instantiations', relation: 'relations', agent: 'agents', record: 'records', repository: 'repositories', function: 'functions' };
 
+    // The server is remembered; the API key is kept for this browser session
+    // only (sessionStorage), so it is gone when the browser closes. Any key an
+    // earlier version left in localStorage is removed on first load.
     function loadConfig() {
-      try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch { return {}; }
+      let cfg = {};
+      try { cfg = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch { cfg = {}; }
+      if (cfg.key) { delete cfg.key; localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg)); }
+      cfg.key = sessionStorage.getItem(STORAGE_KEY + ':key') || '';
+      return cfg;
     }
-    function saveConfig(cfg) { localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg)); }
+    function saveConfig(cfg) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ server: cfg.server }));
+      if (cfg.key) sessionStorage.setItem(STORAGE_KEY + ':key', cfg.key);
+      else sessionStorage.removeItem(STORAGE_KEY + ':key');
+    }
     function loadRecent() {
       try { return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]'); } catch { return []; }
     }
@@ -308,7 +319,7 @@
       const cfg = loadConfig();
       if (!cfg.server || !cfg.key) {
         statusEl.className = 'status';
-        statusEl.innerHTML = 'No server configured yet. Enter a URL + API key and click Save. The key is stored in your browser\'s <code>localStorage</code>, never sent anywhere except the server above.';
+        statusEl.innerHTML = 'No server configured yet. Enter a URL + API key and click Save. The key is kept for this browser session only and is sent nowhere except the server above.';
         return;
       }
       statusEl.className = 'status ok';
@@ -333,7 +344,7 @@
         const resp = await fetch(server + '/health');
         if (resp.ok) {
           statusEl.className = 'status ok';
-          statusEl.innerHTML = `Server reachable. ${key ? 'Key saved in <code>localStorage</code>.' : '<em>No key entered — reads will work, writes will fail.</em>'}`;
+          statusEl.innerHTML = `Server reachable. ${key ? 'Key held for this browser session.' : '<em>No key entered - reads will work, writes will fail.</em>'}`;
         } else {
           statusEl.className = 'status err';
           statusEl.textContent = `Server returned ${resp.status} on /health. Check the URL.`;

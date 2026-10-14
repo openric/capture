@@ -9,7 +9,7 @@ Sibling project: **[@openric/viewer](https://github.com/openric/viewer)**
 
 - Create **Records**, **Agents**, **Repositories**, **Functions**, **Places**, **Rules**, **Activities**, **Instantiations**, and **Relations** against any OpenRiC-conformant server (8 entity types per spec v0.37 §6).
 - Pull the taxonomy (type pickers) live from `/api/ric/v1/vocabulary/{taxonomy}` — so form options always match whatever taxonomy the server actually publishes.
-- Store the server URL + API key in `localStorage` — never sent anywhere except the server you configured.
+- Remember the server URL in `localStorage`; keep the API key for the browser session only (`sessionStorage`). The key is sent nowhere except the server you configured.
 - Log the last 20 captures in `localStorage` so you can verify and navigate.
 
 ## Spec v0.37 dual-read
